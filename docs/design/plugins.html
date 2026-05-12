@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RFview 解调插件体系</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Plugin System</p>
+    <h1>类似 VS Code 的信号解调插件体系</h1>
+    <p class="lead">插件通过 manifest 声明能力，通过受控 API 读取样本、输出分析结果，并可贡献命令、设置项和自定义视图。</p>
+  </header>
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
+  </nav>
+  <main class="layout">
+    <section class="card">
+      <h2>插件能力</h2>
+      <ul>
+        <li><strong>Demodulator</strong>：接收 IQ 样本块，输出符号、比特、帧、协议字段和置信度。</li>
+        <li><strong>Analyzer</strong>：计算占用带宽、调制识别、突发检测、同步点和统计指标。</li>
+        <li><strong>Format Provider</strong>：解析特定厂商或仪器的文件头、sidecar 元数据和样本编码。</li>
+        <li><strong>View Provider</strong>：贡献结果表格、星座图、眼图、协议树或自定义图层。</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Manifest 草案</h2>
+      <pre><code>{
+  "id": "org.example.fsk-demod",
+  "name": "FSK Demodulator",
+  "version": "0.1.0",
+  "engine": "rfview-plugin-api@1",
+  "entry": "plugin.wasm",
+  "capabilities": ["demodulator", "analyzer"],
+  "sampleFormats": ["ci8", "ci16", "cf32"],
+  "permissions": ["readSamples", "writeResults"],
+  "contributes": {
+    "commands": [{ "id": "fsk.start", "title": "Start FSK Demod" }],
+    "settings": [{ "key": "symbolRate", "type": "number", "default": 9600 }]
+  }
+}</code></pre>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>插件生命周期</h2>
+        <ol>
+          <li>发现：扫描用户插件目录和工作区推荐插件。</li>
+          <li>校验：验证 manifest、签名、API 版本和权限声明。</li>
+          <li>激活：按命令、文件格式或用户操作懒加载插件。</li>
+          <li>运行：通过消息通道收发样本块、参数和结果。</li>
+          <li>停止：支持取消任务、保存状态和释放资源。</li>
+        </ol>
+      </article>
+      <article class="card">
+        <h2>安全与性能</h2>
+        <ul>
+          <li>优先使用 WebAssembly 沙箱，限制文件系统、网络和内存配额。</li>
+          <li>插件不可直接读取 TB 文件，只能请求核心引擎提供的受控样本流。</li>
+          <li>结果输出采用结构化 schema，便于缓存、查询、可视化和导出。</li>
+          <li>长时间插件任务必须周期性上报进度，并响应取消信号。</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

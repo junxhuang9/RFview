@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RFview 实施路线</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Roadmap</p>
+    <h1>从方案确认到可运行 MVP 的实施路线</h1>
+    <p class="lead">本路线将设计确认、核心验证、MVP 和插件生态分阶段推进，降低 TB 文件与插件沙箱带来的工程风险。</p>
+  </header>
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
+  </nav>
+  <main class="layout">
+    <section class="card">
+      <h2>阶段计划</h2>
+      <table>
+        <thead><tr><th>阶段</th><th>目标</th><th>验收标准</th></tr></thead>
+        <tbody>
+          <tr><td>0. 方案确认</td><td>确认本文档中的技术路线、MVP 范围和插件边界。</td><td>设计文档评审通过，形成待实现任务清单。</td></tr>
+          <tr><td>1. 技术验证</td><td>验证 TB 级文件范围读取、抽样预览、FFT tile 和 UI 渲染性能。</td><td>使用合成大文件完成随机跳转和起点预览演示。</td></tr>
+          <tr><td>2. MVP</td><td>实现桌面壳、文件打开、元数据、IQ / 频谱 / 瀑布图和基础缓存。</td><td>可分析本地 IQ 文件，并支持从文件开始处快速预览。</td></tr>
+          <tr><td>3. 插件 Alpha</td><td>实现 manifest、WASM 插件宿主、示例解调器和结果视图。</td><td>第三方插件可流式接收样本并输出结构化结果。</td></tr>
+          <tr><td>4. 生态增强</td><td>插件市场、远程文件、GPU 加速、协作标注和批处理。</td><td>形成稳定 API 和向后兼容策略。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>主要风险</h2>
+        <ul>
+          <li><span class="badge warn">性能</span> 瀑布图 tile 生成和渲染可能成为瓶颈，需要早期压测。</li>
+          <li><span class="badge warn">兼容</span> IQ 文件格式差异大，需允许用户手动补充元数据。</li>
+          <li><span class="badge warn">安全</span> 插件能力必须最小授权，避免直接访问敏感文件。</li>
+          <li><span class="badge warn">API</span> 插件 API 一旦公开需要版本化和弃用策略。</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>下一步待确认</h2>
+        <ol>
+          <li>桌面壳选择 Tauri 还是 Electron。</li>
+          <li>首批支持的样本格式：CI8、CI16、CF32 是否足够。</li>
+          <li>MVP 是否需要内置某一种示例解调器，例如 AM、FM、FSK 或 LoRa。</li>
+          <li>是否优先支持 Windows、Linux、macOS 全平台，还是先聚焦一个平台。</li>
+        </ol>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

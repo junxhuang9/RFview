@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RFview 推荐技术路径</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Technology Options</p>
+    <h1>推荐技术路径与取舍</h1>
+    <p class="lead">在检视当前方案后，建议把技术路线拆成“默认主线 + 两条备选路径 + 长期演进路径”，便于按风险、交付速度和生态目标做决策。</p>
+  </header>
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
+  </nav>
+
+  <main class="layout">
+    <section class="card callout">
+      <h2>结论：优先推荐 Path A</h2>
+      <p><strong>默认推荐采用 Tauri + Rust Core + TypeScript 前端 + WebGL/WebGPU + WASM 插件。</strong>原因是它最符合 RFview 的核心矛盾：一方面要安全、高性能地处理 TB 级本地文件；另一方面又要提供类似 VS Code 的跨平台插件和现代 UI 体验。</p>
+    </section>
+
+    <section class="card">
+      <h2>技术路径对比</h2>
+      <table>
+        <thead>
+          <tr><th>路径</th><th>组成</th><th>适用情况</th><th>主要优势</th><th>主要代价</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Path A：推荐主线</strong></td>
+            <td>Tauri + Rust Core + TypeScript/React 或 Svelte + WebGL/WebGPU + WASM 插件</td>
+            <td>面向跨平台桌面版、重视大文件 I/O、安全插件、较小安装包和长期可维护性。</td>
+            <td>Rust 适合 64 位范围读取、mmap、SIMD、并发调度；Tauri 可复用 Web UI 生态且安装包更轻；WASM 插件天然适合沙箱和多语言分发。</td>
+            <td>Tauri 与 WebGPU 能力需要做平台探测；插件 API 需要前期设计好版本化和权限模型。</td>
+          </tr>
+          <tr>
+            <td><strong>Path B：快速生态路径</strong></td>
+            <td>Electron + Rust/Node Native Core + TypeScript/React + WebGL + WASM/Node 插件</td>
+            <td>如果最看重类似 VS Code 的扩展体验、插件 UI 生态和快速前端迭代。</td>
+            <td>Electron 与 VS Code 技术模型接近；插件面板、命令系统、设置系统可借鉴成熟模式；前端调试和招聘更容易。</td>
+            <td>安装包和运行时内存较大；Node 插件安全边界更难控制；TB 文件读写仍应放在 Rust/native core，不能让 JS 直接处理大数据。</td>
+          </tr>
+          <tr>
+            <td><strong>Path C：极致原生性能路径</strong></td>
+            <td>Rust/C++ Core + Qt/QML 或 egui + Vulkan/Metal/OpenGL + WASM/动态库插件</td>
+            <td>如果首要目标是仪器级性能、低内存占用、离线工作站部署和更强 GPU 控制。</td>
+            <td>UI 与渲染链路可完全掌控；原生 GPU、线程和内存模型更直接；适合高刷新瀑布图和长时间采集分析。</td>
+            <td>插件 UI 和生态不如 Web 技术；跨平台 UI 细节成本更高；动态库插件会显著增加安全与 ABI 兼容风险。</td>
+          </tr>
+          <tr>
+            <td><strong>Path D：协作/云端演进路径</strong></td>
+            <td>Rust Analysis Server + Web 前端 + 对象存储 Range Read + Job Queue + Browser WebAssembly</td>
+            <td>作为后续版本，面向团队协作、远程数据湖、服务器预计算和浏览器访问。</td>
+            <td>适合共享 TB 级数据、多人标注、批处理和集中算力；瀑布 tile、索引和插件结果可服务化复用。</td>
+            <td>MVP 阶段复杂度过高；权限、数据传输成本、部署和多租户隔离都更难，不建议作为第一阶段主线。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>为什么当前方案更适合 Path A</h2>
+        <ul>
+          <li><strong>TB 文件读写是核心风险。</strong>Rust core 可以把 64 位偏移、异步 range read、mmap window、预取、背压和缓存索引放在一个可测试的底层库里。</li>
+          <li><strong>UI 不应碰原始大数据。</strong>TypeScript 前端只接收降采样后的波形、FFT tile、统计值和插件结构化结果，避免浏览器进程内存失控。</li>
+          <li><strong>插件需要安全边界。</strong>WASM + manifest 能让解调器跨语言发布，同时通过能力声明限制读样本、写结果、网络和本地文件访问。</li>
+          <li><strong>多域视图适合 Web 渲染。</strong>IQ、频谱、瀑布图、事件表、插件面板和设置系统都可以用成熟 Web 组件快速构建。</li>
+          <li><strong>未来可演进到服务端。</strong>Rust core 如果一开始做成库/服务双形态，后续可迁移到 Path D，而无需重写 DSP 与文件索引。</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>建议的组件选择</h2>
+        <table>
+          <thead><tr><th>模块</th><th>建议</th></tr></thead>
+          <tbody>
+            <tr><td>桌面壳</td><td>优先 Tauri；若插件 UI 强依赖 VS Code 式生态，再评估 Electron。</td></tr>
+            <tr><td>核心语言</td><td>Rust，抽象为 <code>rfview-core</code>，避免绑定到具体 UI。</td></tr>
+            <tr><td>前端框架</td><td>React 更利于复杂插件 UI 生态；Svelte 更轻但生态略小。MVP 可选 React。</td></tr>
+            <tr><td>渲染</td><td>瀑布图优先 WebGL2，保留 WebGPU 探测路径；避免 MVP 被 WebGPU 兼容性阻塞。</td></tr>
+            <tr><td>FFT/DSP</td><td>Rust FFT 库起步，后续增加 SIMD/GPU 后端；插件只消费核心输出的窗口或流。</td></tr>
+            <tr><td>缓存</td><td>SQLite 保存元数据/索引，tile blob 以分块二进制文件保存，避免超大 BLOB 影响数据库。</td></tr>
+            <tr><td>插件</td><td>WASM 为默认 ABI；先只开放解调/分析 API，插件 UI 通过前端贡献点逐步开放。</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>建议落地顺序</h2>
+      <ol>
+        <li><strong>先验证 core。</strong>用 Rust 写最小 <code>rfview-core</code>：打开 CI8/CI16/CF32 文件、按范围读取、生成首屏抽样和 FFT tile。</li>
+        <li><strong>再接 UI。</strong>用 Tauri + TypeScript 做文件打开、元数据表单、起点预览、IQ/频谱/瀑布三视图联动。</li>
+        <li><strong>随后做插件宿主。</strong>先实现 WASM manifest、参数传递、样本流输入、结构化结果输出和取消/进度协议。</li>
+        <li><strong>最后扩展生态能力。</strong>插件 UI、远程对象存储、GPU 加速、批处理、协作标注都放到 MVP 之后。</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

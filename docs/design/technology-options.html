@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RFview 推荐技术路径</title>
+  <title>rfml 推荐技术路径</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -19,7 +19,7 @@
   <main class="layout">
     <section class="card callout">
       <h2>结论：优先推荐 Path A</h2>
-      <p><strong>默认推荐采用 Tauri + Rust Core + TypeScript 前端 + WebGL/WebGPU + WASM 插件。</strong>原因是它最符合 RFview 的核心矛盾：一方面要安全、高性能地处理 TB 级本地文件；另一方面又要提供类似 VS Code 的跨平台插件和现代 UI 体验。</p>
+      <p><strong>默认推荐采用 Tauri + Rust Core + TypeScript 前端 + WebGL/WebGPU + WASM 插件。</strong>原因是它最符合 rfml 的核心矛盾：一方面要安全、高性能地处理 TB 级本地文件；另一方面又要提供类似 VS Code 的跨平台插件和现代 UI 体验。</p>
     </section>
 
     <section class="card">
@@ -79,7 +79,7 @@
           <thead><tr><th>模块</th><th>建议</th></tr></thead>
           <tbody>
             <tr><td>桌面壳</td><td>优先 Tauri；若插件 UI 强依赖 VS Code 式生态，再评估 Electron。</td></tr>
-            <tr><td>核心语言</td><td>Rust，抽象为 <code>rfview-core</code>，避免绑定到具体 UI。</td></tr>
+            <tr><td>核心语言</td><td>Rust，抽象为 <code>rfml-core</code>，避免绑定到具体 UI。</td></tr>
             <tr><td>前端框架</td><td>React 更利于复杂插件 UI 生态；Svelte 更轻但生态略小。MVP 可选 React。</td></tr>
             <tr><td>渲染</td><td>瀑布图优先 WebGL2，保留 WebGPU 探测路径；避免 MVP 被 WebGPU 兼容性阻塞。</td></tr>
             <tr><td>FFT/DSP</td><td>Rust FFT 库起步，后续增加 SIMD/GPU 后端；插件只消费核心输出的窗口或流。</td></tr>
@@ -93,7 +93,7 @@
     <section class="card">
       <h2>建议落地顺序</h2>
       <ol>
-        <li><strong>先验证 core。</strong>用 Rust 写最小 <code>rfview-core</code>：打开 CI8/CI16/CF32 文件、按范围读取、生成首屏抽样和 FFT tile。</li>
+        <li><strong>先验证 core。</strong>用 Rust 写最小 <code>rfml-core</code>：打开 CI8/CI16/CF32 文件、按范围读取、生成首屏抽样和 FFT tile。</li>
         <li><strong>再接 UI。</strong>用 Tauri + TypeScript 做文件打开、元数据表单、起点预览、IQ/频谱/瀑布三视图联动。</li>
         <li><strong>随后做插件宿主。</strong>先实现 WASM manifest、参数传递、样本流输入、结构化结果输出和取消/进度协议。</li>
         <li><strong>最后扩展生态能力。</strong>插件 UI、远程对象存储、GPU 加速、批处理、协作标注都放到 MVP 之后。</li>

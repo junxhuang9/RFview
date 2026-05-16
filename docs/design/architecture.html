@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rfml 系统架构</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Architecture</p>
+    <h1>系统架构与模块边界</h1>
+    <p class="lead">采用“前端交互 + 本地核心引擎 + 插件沙箱 + 持久化缓存”的分层架构，避免 UI 直接处理 TB 级原始数据。</p>
+  </header>
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
+  </nav>
+  <main class="layout">
+    <section class="card">
+      <h2>逻辑分层</h2>
+      <table>
+        <thead><tr><th>层</th><th>职责</th><th>关键接口</th></tr></thead>
+        <tbody>
+          <tr><td>Shell / UI</td><td>工作区、文件选择、布局、快捷键、插件贡献 UI、图表交互。</td><td>Command API、View API、IPC。</td></tr>
+          <tr><td>Signal Core</td><td>样本格式转换、分块调度、FFT、抽样、解调任务编排、缓存写入。</td><td>ChunkReader、SampleWindow、AnalysisJob。</td></tr>
+          <tr><td>Storage Adapter</td><td>本地文件、内存映射、异步读、未来远程 range-read。</td><td>read_range、map_window、prefetch。</td></tr>
+          <tr><td>Plugin Host</td><td>插件发现、权限控制、WASM 运行时、消息路由、资源配额。</td><td>Manifest、Demodulator API、Result Sink。</td></tr>
+          <tr><td>Cache / Index</td><td>文件指纹、元数据、抽样金字塔、FFT tile、用户标注、插件输出。</td><td>SQLite schema、tile blobs。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>数据流</h2>
+      <pre><code>文件 / 远程对象
+  → Storage Adapter 按范围读取
+  → Signal Core 转为统一 SampleBlock
+  → 抽样器 / FFT / 解调插件并行消费
+  → Cache 写入可复用结果
+  → UI 只接收可视化 tile、统计值和插件结构化结果</code></pre>
+      <p>此数据流要求所有耗时操作均可取消、可恢复、可限流，并与前端滚动、缩放和跳转操作解耦。</p>
+    </section>
+
+    <section class="grid three">
+      <article class="card">
+        <h3>统一样本模型</h3>
+        <p>内部使用 <code>SampleBlock</code> 表示一段连续 IQ 样本，包含文件偏移、样本序号、采样率、中心频率、格式、通道数和校准信息。</p>
+      </article>
+      <article class="card">
+        <h3>任务调度</h3>
+        <p>将预览、FFT、插件解调和缓存构建都表达为有优先级的 <code>AnalysisJob</code>，当前视口任务优先于后台索引任务。</p>
+      </article>
+      <article class="card">
+        <h3>跨平台约束</h3>
+        <p>核心文件 I/O 与 DSP 引擎保持平台无关；平台差异封装在文件映射、GPU 能力探测和系统对话框适配层。</p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

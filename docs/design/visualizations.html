@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rfml 多域分析视图</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">Visual Analytics</p>
+    <h1>IQ、频谱、瀑布图与解调结果联动</h1>
+    <p class="lead">所有视图共享统一时间轴和频率上下文，支持从概览到局部细节的渐进式分析。</p>
+  </header>
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
+  </nav>
+  <main class="layout">
+    <section class="card">
+      <h2>内置视图</h2>
+      <table>
+        <thead><tr><th>视图</th><th>用途</th><th>数据来源</th></tr></thead>
+        <tbody>
+          <tr><td>IQ 时域</td><td>查看 I/Q 波形、幅度、相位、异常尖峰和截幅。</td><td>当前窗口样本 + downsample min/max。</td></tr>
+          <tr><td>频谱</td><td>查看当前选区的功率谱密度、峰值、带宽和频率偏移。</td><td>即时 FFT 或缓存 FFT tile。</td></tr>
+          <tr><td>瀑布图</td><td>观察随时间变化的频域能量、突发信号和跳频模式。</td><td>多分辨率 FFT tile。</td></tr>
+          <tr><td>星座图</td><td>辅助调制识别和解调质量评估。</td><td>插件或核心 DSP 输出的符号流。</td></tr>
+          <tr><td>协议 / 事件表</td><td>浏览插件输出的包、帧、同步点、告警和标注。</td><td>结构化插件结果缓存。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>联动交互</h2>
+        <ul>
+          <li>在瀑布图框选时间和频率范围后，IQ 和频谱视图同步切换到对应窗口。</li>
+          <li>在事件表选择一个包后，所有图形视图跳转到该包的时间范围。</li>
+          <li>时间轴支持“回到文件开始处”快捷操作，满足快速定位到起点的需求。</li>
+          <li>视图缩放时先显示缓存概要，随后请求更高分辨率 tile 替换。</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>渲染策略</h2>
+        <ul>
+          <li>前端只渲染可视范围内的点、线或纹理 tile，避免 DOM 大量节点。</li>
+          <li>瀑布图使用 WebGL / WebGPU 纹理流，按 tile 增量上传。</li>
+          <li>颜色映射、动态范围、窗口函数和 FFT 长度均作为可保存的视图参数。</li>
+          <li>离线导出可复用缓存数据生成 PNG、CSV 或报告片段。</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

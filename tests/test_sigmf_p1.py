@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+import json
+import struct
+
+from rfview.cache import CacheIndex
+from rfview.cli import main
+from rfview.datatypes import parse_sigmf_datatype
+from rfview.ingest import inspect_path
+from rfview.samples import read_sigmf_window
+
+
+def write_sigmf_pair(tmp_path):
+    meta = tmp_path / "clean.sigmf-meta"
+    data = tmp_path / "clean.sigmf-data"
+    samples = [(0.0, 1.0), (1.0, 0.0), (-1.0, 0.5), (0.25, -0.25)]
+    data.write_bytes(b"".join(struct.pack("<ff", i, q) for i, q in samples))
+    meta.write_text(
+        json.dumps(
+            {
+                "global": {"core:datatype": "cf32_le", "core:sample_rate": 1_000_000, "demo:scenario": "unit"},
+                "captures": [{"core:sample_start": 0, "core:frequency": 915_000_000}],
+                "annotations": [{"core:sample_start": 1, "core:sample_count": 2, "core:label": "qpsk"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return meta, data
+
+
+def test_parse_sigmf_datatype_width():
+    dtype = parse_sigmf_datatype("ci16_le")
+    assert dtype.bytes_per_sample == 4
+    assert dtype.complex is True
+
+
+def test_sigmf_inspect_generates_health_report_and_cache(tmp_path):
+    meta, _ = write_sigmf_pair(tmp_path)
+    cache_dir = tmp_path / ".rfview-cache"
+
+    report = inspect_path(meta, cache_dir=cache_dir, window_samples=4)
+
+    assert report.format == "sigmf"
+    assert report.gate == "warn"  # demo namespace is preserved but not configured.
+    assert report.summary["sample_count"] == 4
+    assert report.stats["annotation_coverage"] == 0.5
+    assert report.stats["first_screen"]["window_samples"] == 4
+    assert report.cache["stale"] is False
+    assert (cache_dir / "clean.json").exists()
+
+
+def test_sample_window_reader_reads_offset(tmp_path):
+    meta, data = write_sigmf_pair(tmp_path)
+    dtype = parse_sigmf_datatype("cf32_le")
+
+    samples = read_sigmf_window(data, dtype, sample_start=1, sample_count=2)
+
+    assert samples == [(1.0, 0.0), (-1.0, 0.5)]
+
+
+def test_validator_reports_annotation_out_of_bounds(tmp_path):
+    meta, _ = write_sigmf_pair(tmp_path)
+    doc = json.loads(meta.read_text(encoding="utf-8"))
+    doc["annotations"][0]["core:sample_count"] = 99
+    meta.write_text(json.dumps(doc), encoding="utf-8")
+
+    report = inspect_path(meta)
+
+    assert report.gate == "fail"
+    assert any(issue.rule_id == "SIGMF_ANNOTATION_OOB" for issue in report.issues)
+
+
+def test_cache_stale_detects_source_change(tmp_path):
+    meta, data = write_sigmf_pair(tmp_path)
+    cache = CacheIndex.open(tmp_path / "cache")
+    cache.record("asset", [meta, data], {"ok": True})
+
+    assert cache.is_stale("asset") is False
+    data.write_bytes(data.read_bytes() + struct.pack("<ff", 0.0, 0.0))
+    assert cache.is_stale("asset") is True
+
+
+def test_cli_returns_nonzero_for_failing_report(tmp_path, capsys):
+    missing = tmp_path / "missing.sigmf-meta"
+    missing.write_text(json.dumps({"global": {"core:sample_rate": 1}, "captures": [], "annotations": []}), encoding="utf-8")
+
+    code = main(["inspect", str(missing), "--pretty"])
+    output = json.loads(capsys.readouterr().out)
+
+    assert code == 1
+    assert output["gate"] == "fail"

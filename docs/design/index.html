@@ -3,79 +3,88 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>rfml 设计方案总览</title>
+  <title>RFview SigMF 信号阅读器设计总览</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="hero">
-    <p class="eyebrow">rfml / 多域射频信号分析软件</p>
-    <h1>类似 IQ Engine 的 TB 级射频信号文件分析平台设计方案</h1>
-    <p class="lead">本文档仅用于方案评审：先明确架构、数据流、插件模型、可视化能力与交付路线，待确认后再进入程序实现。</p>
+    <p class="eyebrow">RFview / SigMF Dataset Reader</p>
+    <h1>面向 RFML 的 SigMF 信号阅读器与数据集管理平台设计</h1>
+    <p class="lead">本套 HTML 文档用于方案校准：先定义 SigMF 数据集导入、合规检视、统计分析、时频域可视化、元数据编辑与人工标注的产品架构，再进入程序开发。</p>
   </header>
 
   <nav class="topnav" aria-label="设计文档导航">
-    <a href="index.html">总览</a>
+<a href="index.html">总览</a>
     <a href="architecture.html">系统架构</a>
-    <a href="technology-options.html">技术路径</a>
-    <a href="large-file-io.html">TB 级文件读写</a>
-    <a href="plugins.html">解调插件体系</a>
-    <a href="visualizations.html">多域分析视图</a>
+    <a href="sigmf-data-model.html">SigMF 数据模型</a>
+    <a href="dataset-management.html">数据集管理</a>
+    <a href="large-file-io.html">文件读取与索引</a>
+    <a href="statistics.html">统计工具</a>
+    <a href="visualizations.html">可视化分析</a>
+    <a href="annotations.html">标签与元数据</a>
+    <a href="technology-options.html">技术路线</a>
     <a href="roadmap.html">实施路线</a>
   </nav>
 
   <main class="layout">
+    <section class="card callout">
+      <h2>定位</h2>
+      <p>RFview 是 RFML 工作流前置的数据理解与治理工具。它不先追求训练模型，而是回答“这个 SigMF 数据集是否可信、标签是否完整、波形是否符合预期、统计分布是否适合训练”的问题。</p>
+    </section>
+
+    <section class="grid four">
+      <article class="card"><div class="kpi">01</div><div class="kpi-label">检视数据集</div><p>校验 <code>.sigmf-meta</code> / <code>.sigmf-data</code> 配对、全局字段、捕获段和标注段是否符合 SigMF 与项目约定。</p></article>
+      <article class="card"><div class="kpi">02</div><div class="kpi-label">统计数据集</div><p>统计采样率、中心频率、调制体制、SNR、样本数量、类别均衡、标签覆盖率与异常片段。</p></article>
+      <article class="card"><div class="kpi">03</div><div class="kpi-label">观察信号</div><p>联动展示 IQ 波形、幅相、功率谱、瀑布图、时频 ROI 和 RFML 样本切片。</p></article>
+      <article class="card"><div class="kpi">04</div><div class="kpi-label">编辑标注</div><p>读取 SigMF annotations，支持修改 meta、手工打标签、版本化审计和导出训练清单。</p></article>
+    </section>
+
     <section class="card">
-      <h2>设计目标</h2>
-      <ul>
-        <li>面向 IQ / RF capture 等大体量信号文件，支持 TB 级数据的低延迟浏览、抽样预览、局部加载与流式处理。</li>
-        <li>采用类似 VS Code 的扩展机制，使第三方可通过插件贡献解调器、分析器、文件格式解析器与自定义视图。</li>
-        <li>提供 IQ 时域、频谱、瀑布图、元数据、标注与解调结果等多域联动分析体验。</li>
-        <li>默认快速定位到文件起点，同时支持任意时间 / 字节偏移跳转、书签、频段兴趣区与渐进式细化。</li>
-      </ul>
+      <h2>核心用户流程</h2>
+      <div class="flow" aria-label="用户流程">
+        <span>导入 SigMF 数据集</span>
+        <span>合规校验与摘要</span>
+        <span>快速预览波形/频谱</span>
+        <span>统计分布与异常</span>
+        <span>修改元数据/标注</span>
+        <span>导出 RFML 数据清单</span>
+      </div>
     </section>
 
     <section class="grid two">
       <article class="card">
-        <h2>核心用户流程</h2>
-        <ol>
-          <li>打开本地或远程 RF 信号文件，并读取 sidecar 元数据或由用户补充采样率、中心频率、样本格式。</li>
-          <li>系统立即执行文件头部抽样，优先展示文件开始处的 IQ、粗频谱和瀑布缩略图。</li>
-          <li>用户拖动时间轴或输入偏移，后台按需映射对应窗口，并逐级提高 FFT / 解调精度。</li>
-          <li>用户启用解调插件，插件以流式块接收样本，输出解调比特、符号、包、度量或自定义图层。</li>
-        </ol>
+        <h2>MVP 范围</h2>
+        <ul class="checklist">
+          <li>本地文件夹导入：识别 SigMF Recording、Collection 和 Archive。</li>
+          <li>SigMF schema 校验与项目规则校验。</li>
+          <li>单记录首屏预览：IQ、幅度、相位、PSD、瀑布图。</li>
+          <li>数据集统计：文件级、捕获级、标签级和 RFML 切片级。</li>
+          <li>元数据表单编辑、标注时间轴编辑、保存与撤销。</li>
+        </ul>
       </article>
-
       <article class="card">
-        <h2>优先级范围</h2>
-        <dl>
-          <dt>MVP 必须具备</dt>
-          <dd>本地大文件打开、元数据录入、抽样预览、IQ / 频谱 / 瀑布图、插件加载框架、一个示例解调插件。</dd>
-          <dt>后续增强</dt>
-          <dd>远程对象存储、分布式预计算索引、GPU 加速、协作标注、在线插件市场、批处理流水线。</dd>
-        </dl>
+        <h2>非目标 / 延后</h2>
+        <ul>
+          <li>第一阶段不实现模型训练，只输出可供训练使用的 manifest、切片计划和质量报告。</li>
+          <li>第一阶段不强依赖云端；远程对象存储和多人协作作为后续扩展。</li>
+          <li>第一阶段不构建通用解调插件市场，但保留分析插件接口。</li>
+        </ul>
       </article>
     </section>
 
     <section class="card">
-      <h2>建议技术栈</h2>
+      <h2>文档地图</h2>
       <table>
-        <thead>
-          <tr><th>层级</th><th>建议</th><th>原因</th></tr>
-        </thead>
+        <thead><tr><th>页面</th><th>回答的问题</th></tr></thead>
         <tbody>
-          <tr><td>桌面壳</td><td>Tauri 或 Electron</td><td>便于跨平台、文件系统访问、插件 UI 与 WebGL 可视化。</td></tr>
-          <tr><td>核心引擎</td><td>Rust</td><td>适合零拷贝、内存映射、SIMD、并发调度与安全插件边界。</td></tr>
-          <tr><td>前端 UI</td><td>TypeScript + React/Svelte + WebGL/WebGPU</td><td>构建复杂交互视图、时间轴、瀑布图和插件面板。</td></tr>
-          <tr><td>插件 ABI</td><td>WebAssembly + Manifest</td><td>跨语言、安全沙箱、版本可控，适合解调算法分发。</td></tr>
-          <tr><td>预计算缓存</td><td>SQLite + 分块二进制缓存</td><td>保存文件指纹、金字塔抽样、FFT tile、标注和插件结果。</td></tr>
+          <tr><td><a href="architecture.html">系统架构</a></td><td>前端、核心引擎、SigMF 解析器、索引、缓存和标注服务如何分层。</td></tr>
+          <tr><td><a href="sigmf-data-model.html">SigMF 数据模型</a></td><td>如何映射 global / captures / annotations / extensions 到内部 RFML 资产模型。</td></tr>
+          <tr><td><a href="dataset-management.html">数据集管理</a></td><td>如何导入、分组、搜索、质量门禁、版本化和导出数据集。</td></tr>
+          <tr><td><a href="statistics.html">统计工具</a></td><td>需要哪些描述统计、RF 指标、标签分布和异常检测。</td></tr>
+          <tr><td><a href="visualizations.html">可视化分析</a></td><td>如何做波形、频谱、瀑布、时频 ROI 与多视图联动。</td></tr>
+          <tr><td><a href="annotations.html">标签与元数据</a></td><td>如何读取、编辑、审计 SigMF 标签和 meta。</td></tr>
         </tbody>
       </table>
-    </section>
-
-    <section class="card callout">
-      <h2>推荐技术路径</h2>
-      <p>在现有方案基础上，新增了一页技术路径对比。当前建议以 <strong>Tauri + Rust Core + TypeScript 前端 + WebGL/WebGPU + WASM 插件</strong> 作为默认主线，同时保留 Electron、原生 Qt/QML 和云端协作三类备选/演进路线。</p>
-      <p><a href="technology-options.html">查看推荐技术路径与取舍</a></p>
     </section>
   </main>
 </body>

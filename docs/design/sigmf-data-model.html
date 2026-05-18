@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>SigMF 数据模型设计</title><link rel="stylesheet" href="styles.css" /></head>
+<body><header class="hero"><p class="eyebrow">SigMF Data Model</p><h1>SigMF 到 RFML 资产模型的映射</h1><p class="lead">把 SigMF 的 global、captures、annotations 和 extensions 转换为可检视、可统计、可标注、可导出的内部对象。</p></header>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<main class="layout">
+<section class="card"><h2>内部对象</h2><table><thead><tr><th>SigMF 概念</th><th>RFview 对象</th><th>用途</th></tr></thead><tbody>
+<tr><td><code>global</code></td><td>RecordingProfile</td><td>保存 datatype、sample_rate、author、description、license、hw、recorder、sha512 等全局信息。</td></tr>
+<tr><td><code>captures</code></td><td>CaptureSegment</td><td>描述 sample_start、frequency、datetime、sample_rate 覆盖变化，驱动时间轴与频率轴换算。</td></tr>
+<tr><td><code>annotations</code></td><td>LabelSegment</td><td>描述 sample_start、sample_count、freq_lower_edge、freq_upper_edge、label、comment 和项目自定义标签。</td></tr>
+<tr><td><code>extensions</code></td><td>ExtensionNamespace</td><td>登记自定义字段命名空间、schema URL、版本和 UI 表单定义。</td></tr>
+<tr><td><code>collection</code></td><td>DatasetCollection</td><td>组织多个 recording，形成 RFML 数据集、划分集合和质量门禁。</td></tr>
+</tbody></table></section>
+<section class="card"><h2>校验层级</h2><ol><li><strong>结构校验：</strong>JSON 可解析、必需字段存在、datatype 合法、sample_start 单调、sample_count 不越界。</li><li><strong>文件一致性：</strong>meta/data 成对、样本格式与文件大小匹配、hash 可选校验、collection 引用可解析。</li><li><strong>RF 语义校验：</strong>采样率、中心频率、频带边界、时间戳和多 capture 切换是否合理。</li><li><strong>RFML 规则：</strong>标签集合闭包、类别映射、最小片段长度、训练/验证/测试划分不泄漏。</li></ol></section>
+<section class="grid two"><article class="card"><h2>RFML 派生字段</h2><ul><li><code>class_id</code>：由 label taxonomy 映射得到。</li><li><code>split</code>：train / val / test / holdout。</li><li><code>quality_score</code>：由缺失字段、异常统计、人工复核状态汇总。</li><li><code>slice_policy</code>：窗口长度、步长、重叠、是否按标签边界裁剪。</li></ul></article><article class="card"><h2>保留原则</h2><ul><li>未知 SigMF 扩展字段必须保留，不能在保存时丢失。</li><li>编辑器生成的字段使用明确 namespace，避免污染标准字段。</li><li>导出 RFML 清单时只引用原始样本范围，不复制大文件。</li></ul></article></section>
+</main></body></html>

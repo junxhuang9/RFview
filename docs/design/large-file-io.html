@@ -1,60 +1,14 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>rfml TB 级文件读写设计</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="hero">
-    <p class="eyebrow">Large File I/O</p>
-    <h1>TB 级射频文件读写与快速预览</h1>
-    <p class="lead">以范围读取、窗口映射、分块索引和渐进式预计算为基础，保证大文件不会被一次性载入内存。</p>
-  </header>
-  <nav class="topnav" aria-label="设计文档导航">
-    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="technology-options.html">技术路径</a><a href="large-file-io.html">TB 级文件读写</a><a href="plugins.html">解调插件体系</a><a href="visualizations.html">多域分析视图</a><a href="roadmap.html">实施路线</a>
-  </nav>
-  <main class="layout">
-    <section class="card">
-      <h2>关键原则</h2>
-      <ul>
-        <li>只读当前视口和邻近预取窗口，不将完整文件复制到应用内存。</li>
-        <li>文件打开后先读取头部小窗口，立即生成“文件开始处”的抽样预览。</li>
-        <li>后台构建多分辨率抽样金字塔，使任意跨度的时间轴都能快速显示概要。</li>
-        <li>缓存与原始文件分离；缓存失效由文件路径、大小、mtime 和内容指纹共同判断。</li>
-      </ul>
-    </section>
-
-    <section class="card">
-      <h2>读写策略</h2>
-      <table>
-        <thead><tr><th>场景</th><th>策略</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td>打开文件</td><td>读取元数据 + 头部样本窗口</td><td>目标在 1 秒内展示起点附近的 IQ 和粗频谱。</td></tr>
-          <tr><td>视口跳转</td><td>按样本范围换算字节范围并异步读取</td><td>支持从时间、样本序号或字节偏移定位。</td></tr>
-          <tr><td>连续浏览</td><td>环形缓冲 + 邻近窗口预取</td><td>前后各预取若干窗口，滚动时复用缓存。</td></tr>
-          <tr><td>瀑布图缩放</td><td>读取预计算 FFT tile，不足时即时计算</td><td>优先显示低分辨率 tile，再逐步替换为高分辨率 tile。</td></tr>
-          <tr><td>插件解调</td><td>流式块读取 + 背压</td><td>插件处理速度慢时暂停上游读取，避免内存膨胀。</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="grid two">
-      <article class="card">
-        <h2>抽样预览方案</h2>
-        <ol>
-          <li>默认从文件开始处读取首个 preview window。</li>
-          <li>根据样本格式快速解交织 I/Q，并计算 min/max、RMS、功率谱概要。</li>
-          <li>生成多级 downsample：例如 1:1、1:64、1:4096、1:262144。</li>
-          <li>UI 时间轴先展示最粗一级，再按当前缩放请求细粒度数据。</li>
-        </ol>
-      </article>
-      <article class="card callout">
-        <h2>大文件安全边界</h2>
-        <p>所有 API 均使用 64 位偏移和长度；任何读取请求都必须经过边界检查、样本格式校验和最大块大小限制。错误不应导致 UI 阻塞，而应以可恢复诊断呈现。</p>
-      </article>
-    </section>
-  </main>
-</body>
-</html>
+<html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>文件读取与索引设计</title><link rel="stylesheet" href="styles.css" /></head>
+<body><header class="hero"><p class="eyebrow">File I/O & Index</p><h1>SigMF 大文件读取、预览索引与缓存</h1><p class="lead">SigMF 数据文件可能从 MB 到 TB 不等，RFview 必须按样本窗口读取、渐进式计算，并把可视化与统计结果缓存为可复用索引。</p></header>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<main class="layout">
+<section class="card"><h2>读取原则</h2><ul><li>根据 SigMF <code>core:datatype</code> 计算样本宽度，通过 sample_start/sample_count 映射字节范围。</li><li>只读取当前视口、统计任务或导出任务所需范围，避免全文件载入内存。</li><li>支持 chunk reader、mmap window、异步 prefetch 和取消机制。</li><li>所有读取任务必须附带 capture 上下文，正确解释采样率、中心频率和时间戳变化。</li></ul></section>
+<section class="card"><h2>索引与缓存内容</h2><table><thead><tr><th>缓存</th><th>内容</th><th>失效条件</th></tr></thead><tbody>
+<tr><td>Catalog Index</td><td>数据集目录、文件指纹、SigMF 摘要、健康状态。</td><td>路径、大小、mtime、hash 或 meta 内容变化。</td></tr>
+<tr><td>Preview Pyramid</td><td>多分辨率时域 min/max/rms/mean 抽样。</td><td>data 文件变化或 datatype/sample_rate 变化。</td></tr>
+<tr><td>Spectrum Tiles</td><td>按时间片和频率 bin 切分的 PSD/STFT tile。</td><td>FFT 参数、窗函数、样本文件或 capture 频率变化。</td></tr>
+<tr><td>Stats Snapshot</td><td>全局/局部统计、标签分布、异常检测结果。</td><td>统计规则版本、标签或原始数据变化。</td></tr>
+</tbody></table></section>
+<section class="grid three"><article class="card"><h3>首屏策略</h3><p>导入后优先读取文件开头和首个有标签片段，快速展示波形、PSD 与标签概览。</p></article><article class="card"><h3>后台策略</h3><p>空闲时构建预览金字塔和低分辨率瀑布 tile，再按用户浏览位置补齐高分辨率 tile。</p></article><article class="card"><h3>一致性策略</h3><p>保存 meta 后重新计算受影响范围，并在 UI 标记旧缓存已失效或正在刷新。</p></article></section>
+</main></body></html>

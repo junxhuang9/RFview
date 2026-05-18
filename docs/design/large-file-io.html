@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>文件读取与索引设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">File I/O & Index</p><h1>SigMF 大文件读取、预览索引与缓存</h1><p class="lead">SigMF 数据文件可能从 MB 到 TB 不等，RFview 必须按样本窗口读取、渐进式计算，并把可视化与统计结果缓存为可复用索引。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>读取原则</h2><ul><li>根据 SigMF <code>core:datatype</code> 计算样本宽度，通过 sample_start/sample_count 映射字节范围。</li><li>只读取当前视口、统计任务或导出任务所需范围，避免全文件载入内存。</li><li>支持 chunk reader、mmap window、异步 prefetch 和取消机制。</li><li>所有读取任务必须附带 capture 上下文，正确解释采样率、中心频率和时间戳变化。</li></ul></section>
 <section class="card"><h2>索引与缓存内容</h2><table><thead><tr><th>缓存</th><th>内容</th><th>失效条件</th></tr></thead><tbody>

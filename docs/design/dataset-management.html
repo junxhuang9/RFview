@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>数据集管理设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">Dataset Management</p><h1>SigMF 数据集管理与质量门禁</h1><p class="lead">面向 RFML 的数据集管理需要同时管理文件、元数据、标签、统计结果、派生切片和审计状态。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>数据集工作区</h2><ul><li>一个工作区可挂载多个本地目录、SigMF archive 或 collection 文件。</li><li>扫描器为每个 recording 建立唯一资产 ID，并记录路径、大小、mtime、hash、SigMF 版本和导入状态。</li><li>索引数据库只保存目录与派生信息；原始 <code>.sigmf-data</code> 不复制、不改写。</li></ul></section>
 <section class="card"><h2>管理视图</h2><table><thead><tr><th>视图</th><th>主要字段</th><th>操作</th></tr></thead><tbody>

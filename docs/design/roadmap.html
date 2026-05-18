@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>实施路线设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">Roadmap</p><h1>从设计校准到 MVP 的实施路线</h1><p class="lead">本路线把 RFview 分为设计确认、核心验证、可视化标注、RFML 导出和协作扩展五个阶段，避免一开始就陷入完整平台开发。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>阶段计划</h2><table><thead><tr><th>阶段</th><th>目标</th><th>验收标准</th></tr></thead><tbody>
-<tr><td>P0 设计校准</td><td>评审本套 HTML 文档，确定 SigMF 范围、RFML 导出格式和 MVP 边界。</td><td>用户确认页面结构、核心流程、字段模型和质量门禁。</td></tr>
+<tr><td>P0 设计校准 <span class="badge ok">已完成</span></td><td>评审本套 HTML 文档，确定 SigMF 范围、RFML 导出格式和 MVP 边界。</td><td>已形成 <a href="p0-calibration.html">P0 校准结论</a>：页面结构、核心流程、字段模型、RFML manifest 和质量门禁可进入 P1 验证。</td></tr>
 <tr><td>P1 核心验证</td><td>实现 SigMF 解析、schema 校验、样本窗口读取、首屏统计和缓存目录。</td><td>能导入代表性 SigMF 数据，输出健康报告和基本统计。</td></tr>
 <tr><td>P2 可视化 MVP</td><td>实现数据集列表、IQ/PSD/瀑布、标签时间轴和视图联动。</td><td>用户能定位异常片段并确认生成数据是否符合预期。</td></tr>
 <tr><td>P3 标注与元数据</td><td>实现表单编辑、annotation 增删改、diff、撤销和安全写回。</td><td>可完成手工打标签并保存为 SigMF 兼容 meta 或 overlay。</td></tr>
@@ -12,5 +12,5 @@
 <tr><td>P5 扩展能力</td><td>支持远程数据、多人复核、批处理、分析插件和模型回看。</td><td>团队可协作治理大规模 RF 数据集。</td></tr>
 </tbody></table></section>
 <section class="grid two"><article class="card"><h2>MVP 必做清单</h2><ul><li>导入与校验：recording、collection、archive。</li><li>检视：健康摘要、元数据详情、标签覆盖、质量问题。</li><li>统计：幅度、频域、标签、RFML 切片。</li><li>可视化：时域、PSD、瀑布、标签时间轴。</li><li>编辑：meta 表单、annotation 编辑、diff 与写回。</li></ul></article><article class="card"><h2>关键风险</h2><ul><li>SigMF 扩展字段多样，必须保留未知字段并支持 namespace 配置。</li><li>大文件预览性能决定体验，需要优先验证读取与 tile 缓存。</li><li>人工标注写回风险高，需要严格 diff、撤销和审计。</li><li>RFML 导出如果没有质量门禁，容易把脏数据送入训练。</li></ul></article></section>
-<section class="card callout"><h2>下一步建议</h2><p>请先校准本套设计文档：确认导航结构、MVP 范围、SigMF 字段映射、统计指标、标注流程和 RFML 导出格式。确认后再进入 P1 的程序开发。</p></section>
+<section class="card callout"><h2>下一步建议</h2><p>P0 已完成设计校准，下一步进入 P1 核心验证：实现 SigMF 解析、schema 与项目规则校验、样本窗口读取、首屏统计和缓存目录骨架。</p></section>
 </main></body></html>

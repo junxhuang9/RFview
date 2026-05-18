@@ -84,6 +84,18 @@ class SigMFDocument:
                     namespaces.add(key.split(":", 1)[0])
         return sorted(namespaces)
 
+    def capture_frequency_at(self, sample_start: int) -> float | None:
+        if not self.captures:
+            return None
+        ordered_captures = sorted(self.captures, key=lambda capture: capture.sample_start)
+        active = ordered_captures[0]
+        for capture in ordered_captures:
+            if capture.sample_start > sample_start:
+                break
+            active = capture
+        value = active.metadata.get("core:frequency") or active.metadata.get("frequency")
+        return float(value) if value is not None else None
+
     def sample_count_from_file(self) -> int | None:
         if not self.datatype:
             return None
@@ -118,8 +130,13 @@ class SigMFDocument:
             lower = ann.metadata.get("core:freq_lower_edge") or ann.metadata.get("freq_lower")
             upper = ann.metadata.get("core:freq_upper_edge") or ann.metadata.get("freq_upper")
             if nyquist is not None and (lower is not None or upper is not None):
-                if lower is not None and abs(float(lower)) > nyquist or upper is not None and abs(float(upper)) > nyquist:
-                    issues.append(Issue("error", "SIGMF_ANNOTATION_FREQ_OOB", "Annotation frequency edge exceeds Nyquist range.", "Keep annotation frequency bounds within +/- sample_rate/2.", ann_path))
+                center = self.capture_frequency_at(ann.sample_start)
+                min_freq = (center - nyquist) if center is not None else -nyquist
+                max_freq = (center + nyquist) if center is not None else nyquist
+                lower_oob = lower is not None and not min_freq <= float(lower) <= max_freq
+                upper_oob = upper is not None and not min_freq <= float(upper) <= max_freq
+                if lower_oob or upper_oob:
+                    issues.append(Issue("error", "SIGMF_ANNOTATION_FREQ_OOB", "Annotation frequency edge exceeds capture Nyquist range.", "Keep annotation frequency bounds within the active capture center frequency +/- sample_rate/2.", ann_path))
             if "core:label" not in ann.metadata and "label" not in ann.metadata:
                 issues.append(Issue("warning", "SIGMF_ANNOTATION_LABEL_MISSING", "Annotation has no label.", "Add core:label or a project taxonomy label.", ann_path))
         for namespace in self.extension_namespaces():

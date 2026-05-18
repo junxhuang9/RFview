@@ -84,9 +84,9 @@ def annotation_coverage(intervals: Iterable[tuple[int, int]], total_samples: int
     merged: list[tuple[int, int]] = []
     for start, count in sorted((s, c) for s, c in intervals if c > 0):
         end = min(start + count, total_samples)
-        if end <= 0:
-            continue
         start = max(start, 0)
+        if start >= total_samples or end <= start:
+            continue
         if not merged or start > merged[-1][1]:
             merged.append((start, end))
         else:

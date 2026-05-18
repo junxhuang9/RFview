@@ -18,7 +18,7 @@
     <a href="architecture.html">系统架构</a>
     <a href="sigmf-data-model.html">SigMF 数据模型</a>
     <a href="dataset-management.html">数据集管理</a>
-    <a href="large-file-io.html">文件读取与索引</a>
+    <a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a>
     <a href="statistics.html">统计工具</a>
     <a href="visualizations.html">可视化分析</a>
     <a href="annotations.html">标签与元数据</a>
@@ -30,7 +30,7 @@
   <main class="layout">
     <section class="card callout">
       <h2>P0 结论</h2>
-      <p><strong>校准结论：</strong>RFview 的 MVP 先做本地优先的 SigMF 数据检视、统计、可视化、标注与 RFML manifest 导出；不在 P1-P4 内实现模型训练、云端协作或通用插件市场。P1 可以从“导入代表性 SigMF 数据并生成健康报告”开始实现。</p>
+      <p><strong>校准结论：</strong>RFview 的 MVP 先做本地优先的 SigMF 与 HDF5/RadioML 数据检视、统计、可视化、标注与 RFML manifest 导出；不在 P1-P4 内实现模型训练、云端协作或通用插件市场。P1 可以从“导入代表性 SigMF 与 RadioML2018 HDF5 数据并生成健康报告”开始实现。</p>
     </section>
 
     <section class="card">
@@ -40,7 +40,7 @@
         <tbody>
           <tr><td>产品定位</td><td>RFview 是 RFML 训练前的数据理解、治理和标注工具，不负责训练模型。</td><td>导出 manifest、质量报告和切片计划即可闭环 MVP。</td></tr>
           <tr><td>部署形态</td><td>默认本地桌面应用，推荐 Tauri + Rust core + TypeScript/React UI。</td><td>P1 先实现可复用 core，再接 UI；远程数据和多人协作延后。</td></tr>
-          <tr><td>数据安全</td><td><code>.sigmf-data</code> 默认只读，元数据写回必须走 diff、校验、确认和审计。</td><td>编辑器先保存 workspace patch，再提供安全写回。</td></tr>
+          <tr><td>数据安全</td><td><code>.sigmf-data</code> 与 <code>.hdf5</code> 默认只读，元数据写回必须走 diff、校验、确认和审计。</td><td>编辑器先保存 workspace patch，再提供安全写回。</td></tr>
           <tr><td>大文件策略</td><td>任何视图都按样本窗口读取，首屏只生成必要统计和低分辨率预览。</td><td>P1 必须验证 sample window reader、文件指纹和缓存失效。</td></tr>
           <tr><td>RFML 交付物</td><td>导出 JSONL/CSV manifest、质量报告、taxonomy 映射和切片计划。</td><td>后续训练流水线通过 manifest 消费，不直接依赖 RFview 内部数据库。</td></tr>
         </tbody>
@@ -51,8 +51,8 @@
       <article class="card">
         <h2>MVP 内范围</h2>
         <ul class="checklist">
-          <li>识别本地 SigMF recording、collection 和 archive。</li>
-          <li>校验 SigMF schema、必填字段、captures、annotations 和项目规则。</li>
+          <li>识别本地 SigMF recording、collection、archive，以及 HDF5/RadioML2018 文件。</li>
+          <li>校验 SigMF schema、HDF5 X/Y/Z shape、必填字段、captures、annotations 和项目规则。</li>
           <li>展示健康摘要、元数据详情、标签覆盖和质量问题。</li>
           <li>提供 IQ、幅度、相位、PSD、瀑布图和标签时间轴联动。</li>
           <li>支持 meta 表单编辑、annotation 增删改、diff、撤销和安全写回。</li>
@@ -66,7 +66,7 @@
           <li>不要求远程对象存储、权限系统或多人实时协作。</li>
           <li>不构建通用插件市场，只预留分析插件边界。</li>
           <li>不自动修复高风险元数据字段，必须由用户确认。</li>
-          <li>不复制或重写大型 <code>.sigmf-data</code> 原始文件。</li>
+          <li>不复制或重写大型 <code>.sigmf-data</code> 或 <code>.hdf5</code> 原始文件。</li>
         </ul>
       </article>
     </section>
@@ -86,12 +86,25 @@
     </section>
 
     <section class="card">
+      <h2>HDF5/RadioML 范围校准</h2>
+      <table>
+        <thead><tr><th>对象</th><th>P1-P4 必须支持</th><th>处理原则</th></tr></thead>
+        <tbody>
+          <tr><td>HDF5 文件</td><td><code>.h5</code>、<code>.hdf5</code> magic 识别，根节点扫描，shape/dtype/chunk 摘要。</td><td>原始文件只读；索引只保存摘要和派生缓存。</td></tr>
+          <tr><td>RadioML2018</td><td><code>X</code> I/Q frame、<code>Y</code> one-hot 调制标签、<code>Z</code> SNR，以及伴随类别文件。</td><td>按 frame 延迟读取；类别和 SNR 作为样本级标签进入统计与 manifest。</td></tr>
+          <tr><td>Overlay</td><td>split、人工备注、类别修正和质量状态。</td><td>保存到 workspace overlay 或导出 manifest，不回写 HDF5。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
       <h2>RFML manifest 契约</h2>
       <p>RFML 导出以“一个训练样本窗口一行”为核心，JSONL 为主、CSV 为辅。字段命名保持稳定，便于 PyTorch、TensorFlow 或自定义训练流水线读取。</p>
       <pre><code>{
   "asset_id": "rec_0001",
   "source_uri": "file:///data/example.sigmf-data",
   "meta_uri": "file:///data/example.sigmf-meta",
+  "format": "sigmf",
   "sample_start": 1048576,
   "sample_count": 262144,
   "sample_rate": 2000000,
@@ -103,7 +116,7 @@
   "preprocess": { "window": "raw_iq", "dtype": "cf32", "normalization": "none" }
 }</code></pre>
       <ul>
-        <li><strong>必填：</strong>asset_id、source_uri、meta_uri、sample_start、sample_count、sample_rate、label_id、split。</li>
+        <li><strong>必填：</strong>asset_id、source_uri、format、sample_start、sample_count、label_id、split；SigMF 需提供 meta_uri 和 sample_rate，HDF5/RadioML 可用 frame_index 与 snr_db 补充。</li>
         <li><strong>可选：</strong>中心频率、频带上下界、SNR、confidence、reviewed、scenario、emitter、quality flags。</li>
         <li><strong>伴随文件：</strong>taxonomy.json、splits.json、quality-report.json、slice-plan.json。</li>
       </ul>
@@ -113,7 +126,7 @@
       <article class="card">
         <h2>质量门禁</h2>
         <ul class="checklist">
-          <li><span class="badge danger">阻塞</span> meta/data 缺失、datatype 无法解析、文件大小与样本数不匹配。</li>
+          <li><span class="badge danger">阻塞</span> meta/data 缺失、datatype 无法解析、文件大小与样本数不匹配，或 HDF5 X/Y/Z frame 数不一致。</li>
           <li><span class="badge danger">阻塞</span> annotation 越界、频带越过 Nyquist、split 中同一 recording 泄漏。</li>
           <li><span class="badge warn">警告</span> 标签覆盖不足、类别极不均衡、SNR 或幅度统计异常。</li>
           <li><span class="badge warn">警告</span> 未复核标签、未知 namespace、统计快照过期。</li>
@@ -124,6 +137,7 @@
         <h2>P1 代表性样本集</h2>
         <ul>
           <li>小型干净 recording：验证导入、schema 校验和首屏统计。</li>
+          <li>RadioML2018 HDF5：验证 X/Y/Z shape 校验、frame 窗口读取、类别/SNR 分布和 manifest 导出。</li>
           <li>长时间大文件：验证窗口读取、低分辨率预览和取消机制。</li>
           <li>多 capture recording：验证频率、时间戳和样本段映射。</li>
           <li>密集 annotation recording：验证标签时间轴、重叠和覆盖统计。</li>
@@ -138,10 +152,11 @@
         <thead><tr><th>任务</th><th>最小输出</th><th>验收方式</th></tr></thead>
         <tbody>
           <tr><td>SigMF meta parser</td><td>解析 global/captures/annotations/extensions，保留未知字段。</td><td>对代表性样本输出结构化摘要。</td></tr>
+          <tr><td>HDF5/RadioML adapter</td><td>识别 X/Y/Z、类别表、frame_len、dtype、SNR 和 one-hot 标签。</td><td>对 RadioML2018 文件输出结构化摘要和可读取 frame 预览。</td></tr>
           <tr><td>Schema + project rule validator</td><td>区分 error/warning/info，生成规则 ID 和修复建议。</td><td>异常样本能产生健康报告。</td></tr>
-          <tr><td>Sample window reader</td><td>按 datatype 和 sample_start 读取小窗口 IQ。</td><td>读取首屏、标签片段和越界场景。</td></tr>
+          <tr><td>Sample window reader</td><td>按 datatype/sample_start 或 HDF5 frame_index 读取小窗口 IQ。</td><td>读取首屏、标签片段、RadioML frame 和越界场景。</td></tr>
           <tr><td>First-screen stats</td><td>样本数、时长、幅度摘要、PSD 摘要、标签覆盖。</td><td>导入后无需全文件扫描即可展示摘要。</td></tr>
-          <tr><td>Cache skeleton</td><td>记录路径、hash、mtime、规则版本和统计参数。</td><td>meta/data 改变后能标记缓存失效。</td></tr>
+          <tr><td>Cache skeleton</td><td>记录路径、hash、mtime、规则版本、HDF5 layout 和统计参数。</td><td>meta/data/HDF5 layout 改变后能标记缓存失效。</td></tr>
         </tbody>
       </table>
     </section>
@@ -149,8 +164,8 @@
     <section class="card callout purple">
       <h2>P0 验收清单</h2>
       <ul class="checklist">
-        <li>页面结构已覆盖总览、架构、数据模型、数据集管理、文件 I/O、统计、可视化、标注、技术路线、路线图和 P0 校准。</li>
-        <li>核心流程已闭环：导入 → 校验 → 预览 → 统计 → 标注 → 导出。</li>
+        <li>页面结构已覆盖总览、架构、数据模型、数据集管理、文件 I/O、HDF5/RadioML、统计、可视化、标注、技术路线、路线图和 P0 校准。</li>
+        <li>核心流程已闭环：导入 SigMF/HDF5 → 校验 → 预览 → 统计 → 标注/overlay → 导出。</li>
         <li>字段模型已覆盖 SigMF global/captures/annotations/extensions 与 RFML manifest。</li>
         <li>质量门禁已区分阻塞、警告和通过条件。</li>
         <li>下一阶段 P1 任务已拆成可实现、可测试的核心验证项。</li>

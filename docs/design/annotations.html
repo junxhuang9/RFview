@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>标签与元数据设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">Annotations & Metadata</p><h1>SigMF 标签读取、元数据修改与人工标注</h1><p class="lead">RFview 需要既尊重 SigMF 标准字段，又支持项目级标签体系、人工复核、批量修复和安全写回。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>元数据编辑器</h2><table><thead><tr><th>区域</th><th>能力</th><th>保护措施</th></tr></thead><tbody>
 <tr><td>Global 表单</td><td>编辑 datatype、sample_rate、description、author、license、hardware、recorder、自定义字段。</td><td>必填字段、枚举值、单位、hash 字段和 sample_rate 改动影响提示。</td></tr>

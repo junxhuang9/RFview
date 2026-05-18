@@ -1,27 +1,27 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>RFview 系统架构</title><link rel="stylesheet" href="styles.css" /></head>
 <body>
-<header class="hero"><p class="eyebrow">Architecture</p><h1>系统架构与模块边界</h1><p class="lead">RFview 采用“交互前端 + 本地 SigMF/RF 核心 + 索引缓存 + 标注工作区”的架构，让 UI 负责理解与操作，让核心引擎负责大文件、安全写回和可复现统计。</p></header>
+<header class="hero"><p class="eyebrow">Architecture</p><h1>系统架构与模块边界</h1><p class="lead">RFview 采用“交互前端 + 本地 SigMF/HDF5/RF 核心 + 索引缓存 + 标注工作区”的架构，让 UI 负责理解与操作，让核心引擎负责大文件、安全写回和可复现统计。</p></header>
 <nav class="topnav" aria-label="设计文档导航">
-    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a>
+    <a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a>
 </nav>
 <main class="layout">
 <section class="card"><h2>逻辑分层</h2><table><thead><tr><th>层级</th><th>职责</th><th>关键对象</th></tr></thead><tbody>
 <tr><td>Workspace UI</td><td>数据集浏览、检视面板、图表联动、标注编辑、质量报告和导出向导。</td><td>Dataset Explorer、Signal Viewer、Annotation Timeline、Report View。</td></tr>
 <tr><td>Application Service</td><td>项目状态、命令路由、撤销重做、任务进度、权限提示和 RFML 导出策略。</td><td>Command Bus、Job Manager、Undo Stack、Export Plan。</td></tr>
-<tr><td>SigMF Core</td><td>解析/校验 meta，映射 captures/annotations，处理 extension namespace，安全写回 JSON。</td><td>SigMFDocument、CaptureSegment、AnnotationSegment、Schema Validator。</td></tr>
+<tr><td>Format Core</td><td>解析/校验 SigMF meta 与 HDF5 数据集，映射 captures/annotations 或 RadioML frame 标签，处理 extension namespace，安全写回 JSON 或 overlay。</td><td>SigMFDocument、Hdf5Dataset、RadioMLAdapter、CaptureSegment、AnnotationSegment、Schema Validator。</td></tr>
 <tr><td>Signal Core</td><td>按窗口读取 IQ、格式转换、抽样、FFT/STFT、统计指标、异常检测和 tile 生成。</td><td>SampleWindow、ChunkReader、SpectrumTile、StatsJob。</td></tr>
 <tr><td>Index & Cache</td><td>数据集目录索引、文件指纹、预览金字塔、统计结果、标签审计和派生 RFML 切片。</td><td>SQLite Catalog、Tile Blob、Derived Manifest。</td></tr>
 </tbody></table></section>
-<section class="card"><h2>端到端数据流</h2><pre><code>SigMF 文件夹 / Archive
-  → Import Scanner 发现 .sigmf-meta / .sigmf-data / collection
-  → SigMF Core 校验 schema、namespace、captures、annotations
+<section class="card"><h2>端到端数据流</h2><pre><code>SigMF 文件夹 / Archive / HDF5 文件
+  → Import Scanner 发现 .sigmf-meta / .sigmf-data / collection 或 HDF5 X/Y/Z 数据集
+  → Format Core 校验 SigMF schema、namespace、captures、annotations 或 HDF5 shape/dtype/chunk
   → Signal Core 按需读取样本窗口并生成预览/统计/tile
   → Index & Cache 保存摘要、质量问题、预计算结果
   → UI 展示数据集健康度、波形频谱、标签时间轴
   → Annotation Service 修改 meta 或 annotations 并版本化写回</code></pre></section>
 <section class="grid three">
-<article class="card"><h3>不可变原始数据</h3><p><code>.sigmf-data</code> 默认只读，所有标注、派生切片和质量报告与原始样本分离保存，避免破坏采集数据。</p></article>
+<article class="card"><h3>不可变原始数据</h3><p><code>.sigmf-data</code> 与 <code>.hdf5</code> 默认只读，所有标注、派生切片和质量报告与原始样本分离保存，避免破坏采集数据。</p></article>
 <article class="card"><h3>可回放操作</h3><p>元数据编辑和人工打标签都记录命令日志，支持撤销、审计、导出 patch 以及团队复核。</p></article>
 <article class="card"><h3>RFML 就绪</h3><p>内部统一以“样本窗口 + 标签 + 质量指标 + 切片策略”描述训练样本，便于导出 PyTorch、TensorFlow 或自定义训练清单。</p></article>
 </section>

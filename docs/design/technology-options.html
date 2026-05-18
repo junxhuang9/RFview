@@ -1,16 +1,16 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>技术路线设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">Technology Options</p><h1>RFview 推荐技术路线</h1><p class="lead">在先做架构设计、后做程序开发的前提下，技术路线以“本地优先、核心可复用、UI 高交互、缓存可追踪”为原则。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>推荐主线</h2><table><thead><tr><th>模块</th><th>建议</th><th>原因</th></tr></thead><tbody>
 <tr><td>桌面壳</td><td>Tauri</td><td>本地文件访问能力强，打包体积较小，适合 Rust 核心与 Web UI 组合。</td></tr>
-<tr><td>核心引擎</td><td>Rust</td><td>适合安全解析 JSON、64 位文件偏移、mmap、并发任务、FFT/DSP 和缓存索引。</td></tr>
+<tr><td>核心引擎</td><td>Rust</td><td>适合安全解析 JSON/HDF5 摘要、64 位文件偏移、mmap、并发任务、FFT/DSP 和缓存索引。</td></tr>
 <tr><td>前端</td><td>TypeScript + React</td><td>适合复杂表格、表单、时间轴、命令系统和可视化状态管理。</td></tr>
 <tr><td>渲染</td><td>Canvas/WebGL2 起步，预留 WebGPU</td><td>满足瀑布图和大规模点图渲染，兼容性优先。</td></tr>
 <tr><td>持久化</td><td>SQLite + tile blob</td><td>SQLite 保存目录、统计和审计；大块预览/tile 用分块二进制缓存。</td></tr>
 <tr><td>Schema</td><td>JSON Schema + 项目规则 DSL</td><td>区分标准合规、项目规则和 RFML 门禁，便于报告和批处理。</td></tr>
 </tbody></table></section>
-<section class="grid two"><article class="card"><h2>备选路线</h2><ul><li><strong>Electron：</strong>插件生态和 Web 能力更成熟，但资源占用较高。</li><li><strong>Qt/QML：</strong>原生体验强，但 Web 生态、表单和插件 UI 成本更高。</li><li><strong>纯 Web + 后端服务：</strong>适合团队协作和数据湖，但 MVP 部署复杂。</li></ul></article><article class="card"><h2>核心抽象</h2><ul><li><code>rfview-core</code>：SigMF 解析、样本读取、统计、tile 生成。</li><li><code>rfview-app</code>：工作区、任务、缓存、导出。</li><li><code>rfview-ui</code>：React 视图、表单、图表、标注交互。</li><li><code>rfview-schema</code>：规则、taxonomy、RFML manifest 定义。</li></ul></article></section>
-<section class="card callout purple"><h2>开发前验证建议</h2><p>在真正编码前，建议先用 3 到 5 组代表性 SigMF 数据做设计校准：小文件、长时间大文件、多 capture、密集 annotation、异常/损坏 meta。确认每个流程在文档层面可解释后再进入 MVP。</p></section>
+<section class="grid two"><article class="card"><h2>备选路线</h2><ul><li><strong>Electron：</strong>插件生态和 Web 能力更成熟，但资源占用较高。</li><li><strong>Qt/QML：</strong>原生体验强，但 Web 生态、表单和插件 UI 成本更高。</li><li><strong>纯 Web + 后端服务：</strong>适合团队协作和数据湖，但 MVP 部署复杂。</li></ul></article><article class="card"><h2>核心抽象</h2><ul><li><code>rfview-core</code>：SigMF 解析、HDF5/RadioML adapter、样本读取、统计、tile 生成。</li><li><code>rfview-app</code>：工作区、任务、缓存、导出。</li><li><code>rfview-ui</code>：React 视图、表单、图表、标注交互。</li><li><code>rfview-schema</code>：规则、taxonomy、RFML manifest 定义。</li></ul></article></section>
+<section class="card callout purple"><h2>开发前验证建议</h2><p>在真正编码前，建议先用 3 到 5 组代表性 SigMF 数据和 1 组 RadioML2018 HDF5 数据做设计校准：小文件、长时间大文件、多 capture、密集 annotation、异常/损坏 meta、X/Y/Z 大文件。确认每个流程在文档层面可解释后再进入 MVP。</p></section>
 </main></body></html>

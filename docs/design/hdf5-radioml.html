@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HDF5 与 RadioML2018 导入设计</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="eyebrow">HDF5 / RadioML2018</p>
+    <h1>HDF5 文件格式支持与 RadioML2018 数据集兼容</h1>
+    <p class="lead">在 SigMF 之外，RFview 需要能把 HDF5 封装的 RFML 数据集作为只读资产导入，并把 RadioML2018.01A 的 X/Y/Z 结构映射为可浏览、可统计、可导出的内部样本窗口。</p>
+  </header>
+
+  <nav class="topnav" aria-label="设计文档导航">
+    <a href="index.html">总览</a>
+    <a href="architecture.html">系统架构</a>
+    <a href="sigmf-data-model.html">SigMF 数据模型</a>
+    <a href="dataset-management.html">数据集管理</a>
+    <a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a>
+    <a href="statistics.html">统计工具</a>
+    <a href="visualizations.html">可视化分析</a>
+    <a href="annotations.html">标签与元数据</a>
+    <a href="technology-options.html">技术路线</a>
+    <a href="roadmap.html">实施路线</a>
+    <a href="p0-calibration.html">P0 校准</a>
+  </nav>
+
+  <main class="layout">
+    <section class="card callout">
+      <h2>导入目标</h2>
+      <p>HDF5 支持不替代 SigMF，而是增加一个 <strong>Dataset Adapter</strong>：扫描 <code>.h5</code>、<code>.hdf5</code> 文件，识别根目录数据集、shape、dtype、chunk 与属性，再把可解释的数据集投影成 RFview 的 Recording、LabelSegment 和 RFML manifest 行。原始 HDF5 文件默认只读，不复制、不重写。</p>
+    </section>
+
+    <section class="card">
+      <h2>RadioML2018.01A 兼容契约</h2>
+      <table>
+        <thead><tr><th>HDF5 数据集</th><th>预期结构</th><th>RFview 映射</th></tr></thead>
+        <tbody>
+          <tr><td><code>/X</code></td><td><code>[frame, 1024, 2]</code> 或等价的 I/Q 轴布局，float I/Q 分量。</td><td>每个 frame 映射为一个 1024 点复数样本窗口，内部规范化为 <code>cf32</code> 视图。</td></tr>
+          <tr><td><code>/Y</code></td><td><code>[frame, 24]</code> one-hot 调制类别。</td><td>one-hot 最大值索引映射到 modulation taxonomy，生成 <code>label_id</code> 与 <code>label_name</code>。</td></tr>
+          <tr><td><code>/Z</code></td><td><code>[frame, 1]</code> 或 <code>[frame]</code> SNR，常见范围为 -20 dB 到 30 dB、步进 2 dB。</td><td>作为样本级 SNR 字段写入统计索引、筛选器和 RFML manifest。</td></tr>
+          <tr><td><code>/classes*</code> 或伴随 <code>classes-fixed.json</code>/<code>classes-fixed.txt</code></td><td>调制类别顺序。</td><td>优先读取伴随类别文件；缺失时使用内置 RadioML2018 类别顺序并标记警告。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>导入流程</h2>
+        <ol>
+          <li>识别扩展名与 HDF5 magic，列出根节点和必要数据集。</li>
+          <li>校验 <code>X</code>、<code>Y</code>、<code>Z</code> 第一维 frame 数一致，检查 dtype、shape 和 chunk 信息。</li>
+          <li>读取或推断类别表，构建 modulation taxonomy，并记录类别来源。</li>
+          <li>为每个 frame 建立虚拟样本范围：<code>sample_start = frame_index * frame_len</code>，<code>sample_count = frame_len</code>。</li>
+          <li>只按用户视口读取 HDF5 hyperslab，避免一次性载入 21GB 级数据集。</li>
+          <li>生成目录索引、类别/SNR 分布、预览缓存和可导出的 RFML manifest。</li>
+        </ol>
+      </article>
+      <article class="card">
+        <h2>质量门禁</h2>
+        <ul class="checklist">
+          <li><span class="badge danger">阻塞</span> 缺少 <code>X</code>、<code>Y</code> 或 <code>Z</code>，或三者 frame 数不一致。</li>
+          <li><span class="badge danger">阻塞</span> <code>X</code> 无法解释为 I/Q 双通道，或 frame 长度不是正整数。</li>
+          <li><span class="badge warn">警告</span> 类别表缺失、one-hot 多热/全零、SNR 为空或超出预期范围。</li>
+          <li><span class="badge warn">警告</span> HDF5 未 chunk 化或 chunk 形状不利于随机 frame 读取。</li>
+          <li><span class="badge ok">通过</span> X/Y/Z 结构一致、类别可解析、可按 frame 窗口读取 IQ。</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>内部对象映射</h2>
+      <table>
+        <thead><tr><th>RFview 字段</th><th>RadioML2018 来源</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>asset_id</code></td><td>HDF5 文件路径、大小、mtime、hash。</td><td>一个 HDF5 文件作为一个 DatasetAsset；frame 可作为虚拟 recording item。</td></tr>
+          <tr><td><code>source_uri</code></td><td><code>file:///.../GOLD_XYZ_OSC.0001_1024.hdf5#X</code></td><td>manifest 保留 HDF5 URI 与 dataset path，便于训练端延迟读取。</td></tr>
+          <tr><td><code>sample_rate</code>/<code>center_frequency_hz</code></td><td>HDF5 attribute、sidecar manifest 或用户导入配置。</td><td>RadioML2018 通常不提供真实采样上下文；缺失时显示为 unknown，不阻塞调制分类用途。</td></tr>
+          <tr><td><code>label_id</code>/<code>label_name</code></td><td><code>Y</code> one-hot + 类别表。</td><td>生成 <code>mod.ook</code>、<code>mod.qpsk</code> 等稳定 taxonomy ID。</td></tr>
+          <tr><td><code>snr_db</code></td><td><code>Z</code>。</td><td>用于筛选、分组统计、train/val/test 分层抽样和异常报告。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>RFML manifest 示例</h2>
+        <pre><code>{
+  "asset_id": "rml2018_01a",
+  "source_uri": "file:///data/GOLD_XYZ_OSC.0001_1024.hdf5#X",
+  "format": "hdf5.radioml2018",
+  "frame_index": 123456,
+  "sample_start": 126418944,
+  "sample_count": 1024,
+  "sample_dtype": "cf32",
+  "label_id": "mod.qpsk",
+  "label_name": "QPSK",
+  "snr_db": 10,
+  "split": "train"
+}</code></pre>
+      </article>
+      <article class="card">
+        <h2>实现注意事项</h2>
+        <ul>
+          <li>读取层使用 HDF5 hyperslab 或等价切片 API，支持按 frame 批量读取和取消。</li>
+          <li>索引层缓存类别/SNR 分布即可；不要把全部 <code>X</code> 数据展开到 SQLite。</li>
+          <li>可视化层复用现有 IQ/PSD/瀑布组件，但 frame 边界默认不可跨越，除非用户选择连续拼接模式。</li>
+          <li>写回策略保持只读；用户标注或 split 变更保存为 workspace overlay 或伴随 manifest。</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

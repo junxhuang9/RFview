@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>标签与元数据设计</title><link rel="stylesheet" href="styles.css" /></head>
+<body><header class="hero"><p class="eyebrow">Annotations & Metadata</p><h1>SigMF 标签读取、元数据修改与人工标注</h1><p class="lead">RFview 需要既尊重 SigMF 标准字段，又支持项目级标签体系、人工复核、批量修复和安全写回。</p></header>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a></nav>
+<main class="layout">
+<section class="card"><h2>元数据编辑器</h2><table><thead><tr><th>区域</th><th>能力</th><th>保护措施</th></tr></thead><tbody>
+<tr><td>Global 表单</td><td>编辑 datatype、sample_rate、description、author、license、hardware、recorder、自定义字段。</td><td>必填字段、枚举值、单位、hash 字段和 sample_rate 改动影响提示。</td></tr>
+<tr><td>Capture 表格</td><td>新增/修改 capture 段，维护 sample_start、frequency、datetime。</td><td>sample_start 单调校验，频率轴重新计算预览。</td></tr>
+<tr><td>Annotation 时间轴</td><td>新增标签、拖拽边界、编辑频带、修改 label/comment、设置复核状态。</td><td>越界、重叠、类别体系、最小长度和 split 泄漏提示。</td></tr>
+<tr><td>Extension 面板</td><td>显示 namespace、版本、schema URL，编辑项目字段。</td><td>未知字段原样保留，保存前做 namespace schema 校验。</td></tr>
+</tbody></table></section>
+<section class="grid two"><article class="card"><h2>人工打标签流程</h2><ol><li>在瀑布图或时间轴选择时频 ROI。</li><li>选择标签类别、调制类型、信号源、置信度和备注。</li><li>系统生成或更新 SigMF annotation，并实时校验边界。</li><li>复核者确认后标记 reviewed，并写入审计日志。</li></ol></article><article class="card"><h2>保存策略</h2><ul><li>默认保存为工作区 patch，可预览 diff 后再写回 <code>.sigmf-meta</code>。</li><li>写回时保持 JSON 格式稳定，减少无意义 diff。</li><li>每次保存记录操作者、时间、变更字段、旧值摘要和新值摘要。</li><li>支持导出独立 annotation overlay，便于不改原始 meta 的协作场景。</li></ul></article></section>
+<section class="card"><h2>标签体系</h2><p>项目可以定义 label taxonomy，例如 modulation、emitter、scenario、snr_bucket、quality_flag。RFview 应提供 taxonomy 管理器，把自由文本标签映射成 RFML 训练可用的稳定类别 ID，并在导出时输出映射表。</p></section>
+<section class="card callout"><h2>风险控制</h2><p>任何会改变样本解释的字段（例如 datatype、sample_rate、captures frequency）都属于高风险编辑。UI 必须展示影响范围，要求用户确认，并使相关预览、统计和 RFML manifest 缓存失效。</p></section>
+</main></body></html>

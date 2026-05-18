@@ -7,7 +7,7 @@ from rfview.cache import CacheIndex
 from rfview.cli import main
 from rfview.datatypes import parse_sigmf_datatype
 from rfview.ingest import inspect_path
-from rfview.samples import read_sigmf_window
+from rfview.samples import annotation_coverage, read_sigmf_window
 
 
 def write_sigmf_pair(tmp_path):
@@ -56,6 +56,36 @@ def test_sample_window_reader_reads_offset(tmp_path):
     samples = read_sigmf_window(data, dtype, sample_start=1, sample_count=2)
 
     assert samples == [(1.0, 0.0), (-1.0, 0.5)]
+
+
+def test_annotation_coverage_ignores_intervals_outside_trimmed_data():
+    coverage = annotation_coverage([(10, 20), (150, 75), (300, 50)], total_samples=200)
+
+    assert coverage == 0.35
+
+
+def test_sigmf_frequency_edges_are_checked_against_capture_center(tmp_path):
+    meta, _ = write_sigmf_pair(tmp_path)
+    doc = json.loads(meta.read_text(encoding="utf-8"))
+    doc["annotations"][0]["core:freq_lower_edge"] = 914_900_000
+    doc["annotations"][0]["core:freq_upper_edge"] = 915_100_000
+    meta.write_text(json.dumps(doc), encoding="utf-8")
+
+    report = inspect_path(meta)
+
+    assert not any(issue.rule_id == "SIGMF_ANNOTATION_FREQ_OOB" for issue in report.issues)
+
+
+def test_sigmf_frequency_edges_outside_capture_nyquist_are_reported(tmp_path):
+    meta, _ = write_sigmf_pair(tmp_path)
+    doc = json.loads(meta.read_text(encoding="utf-8"))
+    doc["annotations"][0]["core:freq_lower_edge"] = 913_000_000
+    doc["annotations"][0]["core:freq_upper_edge"] = 915_100_000
+    meta.write_text(json.dumps(doc), encoding="utf-8")
+
+    report = inspect_path(meta)
+
+    assert any(issue.rule_id == "SIGMF_ANNOTATION_FREQ_OOB" for issue in report.issues)
 
 
 def test_validator_reports_annotation_out_of_bounds(tmp_path):

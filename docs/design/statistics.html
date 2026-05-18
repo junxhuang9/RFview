@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>统计工具设计</title><link rel="stylesheet" href="styles.css" /></head>
 <body><header class="hero"><p class="eyebrow">Statistics</p><h1>数据集统计与质量分析工具</h1><p class="lead">统计工具帮助判断生成的数据集是否符合预期，并为 RFML 训练前的数据筛选、均衡与异常排查提供依据。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
 <section class="card"><h2>统计类别</h2><table><thead><tr><th>类别</th><th>指标</th><th>用途</th></tr></thead><tbody>
-<tr><td>文件/采集统计</td><td>文件数、总样本、总时长、datatype、采样率、中心频率、capture 数量。</td><td>确认数据规模、采集配置和文件一致性。</td></tr>
+<tr><td>文件/采集统计</td><td>文件数、总样本、总时长、datatype/dtype、采样率、中心频率、capture 数量、HDF5 frame 数。</td><td>确认数据规模、采集配置和文件一致性。</td></tr>
 <tr><td>信号幅度统计</td><td>I/Q mean、std、min/max、RMS、PAPR、直流偏置、饱和比例、NaN/Inf。</td><td>发现剪切、归一化错误、硬件偏置和损坏样本。</td></tr>
 <tr><td>频域统计</td><td>平均 PSD、占用带宽、峰值频点、频谱平坦度、噪声底、带外能量。</td><td>确认调制信号频带、干扰和采集频率配置。</td></tr>
 <tr><td>标签统计</td><td>类别数量、标签片段数、覆盖率、重叠率、片段长度分布、频带宽度分布。</td><td>判断 RFML 类别均衡与标注质量。</td></tr>
 <tr><td>切片统计</td><td>窗口数、每类切片数、split 分布、重复片段、边界裁剪比例。</td><td>评估训练样本数量和 train/val/test 泄漏风险。</td></tr>
 </tbody></table></section>
-<section class="grid two"><article class="card"><h2>异常检测规则</h2><ul><li>文件大小与 datatype/sample_count 不匹配。</li><li>样本幅度长期为 0、全常量、严重饱和或 I/Q 通道交换可疑。</li><li>标签超出文件范围、频带超出 Nyquist 范围、标签重叠冲突。</li><li>某类样本过少、split 中同一 recording 被拆到多个集合导致泄漏。</li></ul></article><article class="card"><h2>统计交互</h2><ul><li>点击统计图上的异常点，联动打开对应样本范围的波形/瀑布图。</li><li>统计结果可按 recording、label、capture、split 和自定义字段分组。</li><li>每个统计快照保存规则版本和参数，保证报告可复现。</li></ul></article></section>
+<section class="grid two"><article class="card"><h2>异常检测规则</h2><ul><li>文件大小与 datatype/sample_count 不匹配，或 HDF5 X/Y/Z frame 维度不一致。</li><li>样本幅度长期为 0、全常量、严重饱和或 I/Q 通道交换可疑。</li><li>标签超出文件范围、频带超出 Nyquist 范围、标签重叠冲突。</li><li>某类样本过少、split 中同一 recording 被拆到多个集合导致泄漏。</li></ul></article><article class="card"><h2>统计交互</h2><ul><li>点击统计图上的异常点，联动打开对应样本范围的波形/瀑布图。</li><li>统计结果可按 recording、label、capture、split 和自定义字段分组。</li><li>每个统计快照保存规则版本和参数，保证报告可复现。</li></ul></article></section>
 <section class="card callout"><h2>报告输出</h2><p>质量报告应包含摘要评分、阻塞问题、警告问题、标签覆盖、类别均衡、频段覆盖、代表性截图引用和 RFML 导出建议。报告既可在 UI 查看，也可导出为 HTML/JSON，便于训练流水线消费。</p></section>
 </main></body></html>

@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>数据集管理设计</title><link rel="stylesheet" href="styles.css" /></head>
-<body><header class="hero"><p class="eyebrow">Dataset Management</p><h1>SigMF 数据集管理与质量门禁</h1><p class="lead">面向 RFML 的数据集管理需要同时管理文件、元数据、标签、统计结果、派生切片和审计状态。</p></header>
-<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
+<body><header class="hero"><p class="eyebrow">Dataset Management</p><h1>SigMF 与 HDF5 数据集管理和质量门禁</h1><p class="lead">面向 RFML 的数据集管理需要同时管理文件、元数据、标签、统计结果、派生切片和审计状态。</p></header>
+<nav class="topnav"><a href="index.html">总览</a><a href="architecture.html">系统架构</a><a href="sigmf-data-model.html">SigMF 数据模型</a><a href="dataset-management.html">数据集管理</a><a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a><a href="statistics.html">统计工具</a><a href="visualizations.html">可视化分析</a><a href="annotations.html">标签与元数据</a><a href="technology-options.html">技术路线</a><a href="roadmap.html">实施路线</a><a href="p0-calibration.html">P0 校准</a></nav>
 <main class="layout">
-<section class="card"><h2>数据集工作区</h2><ul><li>一个工作区可挂载多个本地目录、SigMF archive 或 collection 文件。</li><li>扫描器为每个 recording 建立唯一资产 ID，并记录路径、大小、mtime、hash、SigMF 版本和导入状态。</li><li>索引数据库只保存目录与派生信息；原始 <code>.sigmf-data</code> 不复制、不改写。</li></ul></section>
+<section class="card"><h2>数据集工作区</h2><ul><li>一个工作区可挂载多个本地目录、SigMF archive、collection 文件或 HDF5/RadioML2018 文件。</li><li>扫描器为每个 recording 或 HDF5 dataset asset 建立唯一资产 ID，并记录路径、大小、mtime、hash、格式族、schema/shape 摘要和导入状态。</li><li>索引数据库只保存目录与派生信息；原始 <code>.sigmf-data</code> 和 <code>.hdf5</code> 不复制、不改写。</li></ul></section>
 <section class="card"><h2>管理视图</h2><table><thead><tr><th>视图</th><th>主要字段</th><th>操作</th></tr></thead><tbody>
-<tr><td>Recording 列表</td><td>名称、采样率、中心频率、样本数、时长、datatype、标签数、健康状态。</td><td>打开、重新校验、生成预览、加入集合、导出报告。</td></tr>
+<tr><td>Recording / Dataset 列表</td><td>名称、格式、采样率、中心频率、样本数或 frame 数、时长、datatype/dtype、标签数、健康状态。</td><td>打开、重新校验、生成预览、加入集合、导出报告。</td></tr>
 <tr><td>Collection 视图</td><td>集合名称、成员数量、类别分布、split 分布、覆盖频段、覆盖时间。</td><td>划分 train/val/test、批量规则检查、导出 manifest。</td></tr>
 <tr><td>质量问题面板</td><td>问题等级、文件、样本范围、规则 ID、修复建议。</td><td>定位、忽略、批量修复、生成待办。</td></tr>
 <tr><td>派生资产视图</td><td>预览 tile、统计快照、切片清单、人工标注版本。</td><td>清理缓存、重新计算、比较版本。</td></tr>
 </tbody></table></section>
-<section class="grid two"><article class="card"><h2>检索与筛选</h2><ul><li>按频段、采样率、datatype、标签、SNR、时长、采集设备、采集日期筛选。</li><li>支持保存查询，例如“所有 unlabeled 且 SNR &lt; 5 dB 的片段”。</li><li>支持全文搜索 comment、description、author 和自定义 namespace 字段。</li></ul></article><article class="card"><h2>RFML 导出</h2><ul><li>导出 JSONL/CSV manifest：文件 URI、样本起止、标签、split、预处理参数。</li><li>导出质量报告：标签覆盖、类别均衡、异常片段、未通过规则。</li><li>导出切片计划：窗口长度、步长、是否跳过低质量片段。</li></ul></article></section>
+<section class="grid two"><article class="card"><h2>检索与筛选</h2><ul><li>按格式、频段、采样率、datatype/dtype、调制标签、SNR、时长、采集设备、采集日期筛选。</li><li>支持保存查询，例如“所有 unlabeled 且 SNR &lt; 5 dB 的片段”。</li><li>支持全文搜索 comment、description、author 和自定义 namespace 字段。</li></ul></article><article class="card"><h2>RFML 导出</h2><ul><li>导出 JSONL/CSV manifest：文件 URI、样本起止、标签、split、预处理参数。</li><li>导出质量报告：标签覆盖、类别均衡、异常片段、未通过规则。</li><li>导出切片计划：窗口长度、步长、是否跳过低质量片段。</li></ul></article></section>
 <section class="card callout purple"><h2>质量门禁建议</h2><p>进入训练前必须通过四类门禁：SigMF 合规、样本文件一致、标签完整、训练划分无泄漏。未通过门禁的数据仍可浏览，但导出 RFML manifest 时应明确标记或阻止。</p></section>
 </main></body></html>

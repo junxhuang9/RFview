@@ -10,7 +10,7 @@
   <header class="hero">
     <p class="eyebrow">RFview / SigMF Dataset Reader</p>
     <h1>面向 RFML 的 SigMF 信号阅读器与数据集管理平台设计</h1>
-    <p class="lead">本套 HTML 文档用于方案校准：先定义 SigMF 数据集导入、合规检视、统计分析、时频域可视化、元数据编辑与人工标注的产品架构，再进入程序开发。</p>
+    <p class="lead">本套 HTML 文档用于方案校准：先定义 SigMF 与 HDF5/RadioML 数据集导入、合规检视、统计分析、时频域可视化、元数据编辑与人工标注的产品架构，再进入程序开发。</p>
   </header>
 
   <nav class="topnav" aria-label="设计文档导航">
@@ -18,7 +18,7 @@
     <a href="architecture.html">系统架构</a>
     <a href="sigmf-data-model.html">SigMF 数据模型</a>
     <a href="dataset-management.html">数据集管理</a>
-    <a href="large-file-io.html">文件读取与索引</a>
+    <a href="large-file-io.html">文件读取与索引</a><a href="hdf5-radioml.html">HDF5/RadioML</a>
     <a href="statistics.html">统计工具</a>
     <a href="visualizations.html">可视化分析</a>
     <a href="annotations.html">标签与元数据</a>
@@ -42,7 +42,7 @@
     <section class="card">
       <h2>核心用户流程</h2>
       <div class="flow" aria-label="用户流程">
-        <span>导入 SigMF 数据集</span>
+        <span>导入 SigMF / HDF5 数据集</span>
         <span>合规校验与摘要</span>
         <span>快速预览波形/频谱</span>
         <span>统计分布与异常</span>
@@ -55,7 +55,7 @@
       <article class="card">
         <h2>MVP 范围</h2>
         <ul class="checklist">
-          <li>本地文件夹导入：识别 SigMF Recording、Collection 和 Archive。</li>
+          <li>本地文件夹导入：识别 SigMF Recording、Collection、Archive，以及 HDF5/RadioML2018 文件。</li>
           <li>SigMF schema 校验与项目规则校验。</li>
           <li>单记录首屏预览：IQ、幅度、相位、PSD、瀑布图。</li>
           <li>数据集统计：文件级、捕获级、标签级和 RFML 切片级。</li>
@@ -80,6 +80,7 @@
           <tr><td><a href="architecture.html">系统架构</a></td><td>前端、核心引擎、SigMF 解析器、索引、缓存和标注服务如何分层。</td></tr>
           <tr><td><a href="sigmf-data-model.html">SigMF 数据模型</a></td><td>如何映射 global / captures / annotations / extensions 到内部 RFML 资产模型。</td></tr>
           <tr><td><a href="dataset-management.html">数据集管理</a></td><td>如何导入、分组、搜索、质量门禁、版本化和导出数据集。</td></tr>
+          <tr><td><a href="hdf5-radioml.html">HDF5/RadioML</a></td><td>如何识别 HDF5 文件，并兼容 RadioML2018.01A 的 X/Y/Z 数据集结构。</td></tr>
           <tr><td><a href="statistics.html">统计工具</a></td><td>需要哪些描述统计、RF 指标、标签分布和异常检测。</td></tr>
           <tr><td><a href="visualizations.html">可视化分析</a></td><td>如何做波形、频谱、瀑布、时频 ROI 与多视图联动。</td></tr>
           <tr><td><a href="annotations.html">标签与元数据</a></td><td>如何读取、编辑、审计 SigMF 标签和 meta。</td></tr>

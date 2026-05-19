@@ -64,6 +64,26 @@ def test_annotation_coverage_ignores_intervals_outside_trimmed_data():
     assert coverage == 0.35
 
 
+def test_declared_sample_count_must_match_data_file_length(tmp_path):
+    meta, _ = write_sigmf_pair(tmp_path)
+    doc = json.loads(meta.read_text(encoding="utf-8"))
+    doc["global"]["traceability:sample_length"] = 100
+    doc["annotations"][0]["core:sample_start"] = 90
+    doc["annotations"][0]["core:sample_count"] = 10
+    meta.write_text(json.dumps(doc), encoding="utf-8")
+
+    report = inspect_path(meta)
+    rule_ids = [issue.rule_id for issue in report.issues]
+
+    assert report.gate == "fail"
+    assert "SIGMF_SAMPLE_COUNT_MISMATCH" in rule_ids
+    assert "SIGMF_ANNOTATION_OOB" in rule_ids
+    assert report.summary["sample_count"] == 4
+    assert report.summary["declared_sample_count"] == 100
+    assert report.summary["sample_count_matches_data"] is False
+    assert report.stats["annotation_coverage"] == 0.0
+
+
 def test_sigmf_frequency_edges_are_checked_against_capture_center(tmp_path):
     meta, _ = write_sigmf_pair(tmp_path)
     doc = json.loads(meta.read_text(encoding="utf-8"))

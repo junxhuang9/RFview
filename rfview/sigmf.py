@@ -107,6 +107,26 @@ class SigMFDocument:
             return None
         return size // self.datatype.bytes_per_sample
 
+    def declared_sample_count(self) -> int | None:
+        """Return the sample length declared by metadata, if present."""
+        candidates = (
+            self.global_meta.get("core:sample_count"),
+            self.global_meta.get("core:num_samples"),
+            self.global_meta.get("traceability:sample_length"),
+            self.global_meta.get("sample_count"),
+        )
+        for value in candidates:
+            if value is not None:
+                return int(value)
+        return None
+
+    def sample_count_matches_data(self) -> bool | None:
+        declared = self.declared_sample_count()
+        data_samples = self.sample_count_from_file()
+        if declared is None or data_samples is None:
+            return None
+        return declared == data_samples
+
     def validate(self) -> list[Issue]:
         issues = list(self.issues)
         if self.sample_rate is None:
@@ -120,6 +140,17 @@ class SigMFDocument:
         if starts != sorted(starts):
             issues.append(Issue("error", "SIGMF_CAPTURE_ORDER", "Capture sample_start values are not monotonic.", "Sort captures by core:sample_start.", "captures"))
         total_samples = self.sample_count_from_file()
+        declared_samples = self.declared_sample_count()
+        if declared_samples is not None and total_samples is not None and declared_samples != total_samples:
+            issues.append(
+                Issue(
+                    "error",
+                    "SIGMF_SAMPLE_COUNT_MISMATCH",
+                    f"Metadata declares {declared_samples} samples but the data file contains {total_samples} samples.",
+                    "Make the .sigmf-data byte length match the metadata sample count, or fix the metadata declaration.",
+                    "global",
+                )
+            )
         nyquist = (self.sample_rate / 2.0) if self.sample_rate else None
         for index, ann in enumerate(self.annotations):
             ann_path = f"annotations[{index}]"
@@ -150,6 +181,8 @@ class SigMFDocument:
             "datatype": self.datatype.raw if self.datatype else self.global_meta.get("core:datatype"),
             "sample_rate": self.sample_rate,
             "sample_count": self.sample_count_from_file(),
+            "declared_sample_count": self.declared_sample_count(),
+            "sample_count_matches_data": self.sample_count_matches_data(),
             "captures": len(self.captures),
             "annotations": len(self.annotations),
             "extensions": self.extension_namespaces(),

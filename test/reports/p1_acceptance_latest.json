@@ -1,0 +1,267 @@
+{
+  "started_at": "2026-05-19T00:33:11.797191+00:00",
+  "finished_at": "2026-05-19T00:33:12.729948+00:00",
+  "data_source_policy": "Data/ fixtures are read-only; this program verifies them without modifying Data/.",
+  "checks": {
+    "pytest": {
+      "passed": true,
+      "returncode": 0
+    },
+    "health_report_parseable": {
+      "passed": true,
+      "parse_error": null
+    },
+    "meta_data_length_verification": {
+      "passed": true,
+      "declared_sample_count": 22372352,
+      "data_sample_count": 166912,
+      "sample_count_matches_data": false,
+      "expected_issue": "SIGMF_SAMPLE_COUNT_MISMATCH"
+    },
+    "cli_rejects_invalid_fixture": {
+      "passed": true,
+      "returncode": 1,
+      "gate": "fail"
+    }
+  },
+  "health_summary": {
+    "gate": "fail",
+    "format": "sigmf",
+    "summary": {
+      "annotations": 3286,
+      "captures": 310,
+      "data_path": "/workspace/RFview/Data/trimmedSamples.sigmf-data",
+      "datatype": "cf32_le",
+      "declared_sample_count": 22372352,
+      "extensions": [
+        "traceability"
+      ],
+      "meta_path": "/workspace/RFview/Data/trimmedSamples.sigmf-meta",
+      "sample_count": 166912,
+      "sample_count_matches_data": false,
+      "sample_rate": 81920000.0
+    },
+    "stats": {
+      "annotation_coverage": 0.852760736196319,
+      "first_screen": {
+        "annotation_coverage": 0.852760736196319,
+        "duration_seconds": 5e-05,
+        "iq_max": {
+          "i": 0.0,
+          "q": 0.0
+        },
+        "iq_mean": {
+          "i": 0.0,
+          "q": 0.0
+        },
+        "iq_min": {
+          "i": 0.0,
+          "q": 0.0
+        },
+        "nan_or_inf": 0,
+        "papr_db": null,
+        "peak": 0.0,
+        "psd_preview": [
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0
+        ],
+        "rms": 0.0,
+        "window_samples": 4096
+      }
+    },
+    "issue_counts": {
+      "error": 3284,
+      "warning": 1,
+      "info": 0
+    },
+    "first_issues": [
+      {
+        "message": "Metadata declares 22372352 samples but the data file contains 166912 samples.",
+        "path": "global",
+        "rule_id": "SIGMF_SAMPLE_COUNT_MISMATCH",
+        "severity": "error",
+        "suggestion": "Make the .sigmf-data byte length match the metadata sample count, or fix the metadata declaration."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[3]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[4]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[5]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[6]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[7]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[8]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[9]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[10]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[11]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[12]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[13]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[14]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[15]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[16]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[17]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[18]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[19]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[20]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      },
+      {
+        "message": "Annotation exceeds data file sample range.",
+        "path": "annotations[21]",
+        "rule_id": "SIGMF_ANNOTATION_OOB",
+        "severity": "error",
+        "suggestion": "Clamp the annotation or fix the data/sample metadata."
+      }
+    ],
+    "issues_truncated": true
+  },
+  "raw_commands": {
+    "pytest": {
+      "command": [
+        "/root/.pyenv/versions/3.12.13/bin/python",
+        "-m",
+        "pytest"
+      ],
+      "returncode": 0,
+      "stdout_excerpt": "============================= test session starts ==============================\nplatform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0\nrootdir: /workspace/RFview\nconfigfile: pyproject.toml\ntestpaths: tests\ncollected 12 items\n\ntests/test_hdf5_p1.py ..                                                 [ 16%]\ntests/test_sigmf_p1.py ..........                                        [100%]\n\n============================== 12 passed in 0.07s ==============================\n",
+      "stdout_truncated": false,
+      "stderr_excerpt": "",
+      "stderr_truncated": false
+    },
+    "inspect": {
+      "command": [
+        "/root/.pyenv/versions/3.12.13/bin/python",
+        "-m",
+        "rfview.cli",
+        "inspect",
+        "/workspace/RFview/Data/trimmedSamples.sigmf-meta",
+        "--cache-dir",
+        "/workspace/RFview/test/.rfview-cache",
+        "--pretty"
+      ],
+      "returncode": 1,
+      "stdout_excerpt": "{\n  \"asset_id\": \"trimmedSamples\",\n  \"cache\": {\n    \"path\": \"/workspace/RFview/test/.rfview-cache/trimmedSamples.json\",\n    \"rule_version\": \"p1.0\",\n    \"stale\": false\n  },\n  \"format\": \"sigmf\",\n  \"gate\": \"fail\",\n  \"issues\": [\n    {\n      \"message\": \"Metadata declares 22372352 samples but the data file contains 166912 samples.\",\n      \"path\": \"global\",\n      \"rule_id\": \"SIGMF_SAMPLE_COUNT_MISMATCH\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Make the .sigmf-data byte length match the metadata sample count, or fix the metadata declaration.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[3]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[4]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[5]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[6]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[7]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[8]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[9]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[10]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[11]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[12]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[13]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[14]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[15]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"error\",\n      \"suggestion\": \"Clamp the annotation or fix the data/sample metadata.\"\n    },\n    {\n      \"message\": \"Annotation exceeds data file sample range.\",\n      \"path\": \"annotations[16]\",\n      \"rule_id\": \"SIGMF_ANNOTATION_OOB\",\n      \"severity\": \"e",
+      "stdout_truncated": true,
+      "stderr_excerpt": "",
+      "stderr_truncated": false
+    }
+  },
+  "passed": true
+}

@@ -1,0 +1,4802 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RFview · SigMF 数据可视化与 RFML 标注</title>
+  <!-- Plotly.js CDN — 如果加载失败会触发 onerror 回调显示离线提示 -->
+  <!-- 提示: 离线使用可将 plotly.min.js 下载到本地，用 <script src="plotly.min.js"> 替换 -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"
+          onerror="document.getElementById('plotlyFallbackMsg').style.display='block'"></script>
+  <style>
+    /* ============================================================
+       CSS 变量 — 与 RFview 设计系统保持一致（蓝色主题）
+       ============================================================ */
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --ink: #1f2a37;
+      --ink-light: #4b5a70;
+      --muted: #6b7b8f;
+      --brand: #1e66f5;
+      --brand-hover: #1650d0;
+      --brand-dark: #0f2755;
+      --brand-light: #e3edff;
+      --line: #dfe7f5;
+      --line-strong: #c5d3eb;
+      --ok: #059669;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --shadow: 0 4px 16px rgba(15, 23, 42, .07);
+      --shadow-lg: 0 12px 36px rgba(15, 23, 42, .10);
+      --radius: 10px;
+      --radius-sm: 8px;
+      --transition: .2s ease;
+      --sidebar-w: 320px;
+      --resizer-w: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--ink);
+      background: var(--bg);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- 顶部导航栏 ---- */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .navbar .logo {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--brand-dark);
+      letter-spacing: -.3px;
+    }
+    .navbar .logo span { color: var(--brand); }
+    .navbar .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .navbar .controls label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink-light);
+      white-space: nowrap;
+    }
+
+    .file-picker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .file-picker input[type="file"] { display: none; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition), transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-hover); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--line-strong);
+      color: var(--ink-light);
+    }
+    .btn-outline:hover {
+      background: var(--brand-light);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+    .file-label {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ---- 采样范围控制器 ---- */
+    .range-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .range-controls input[type="number"] {
+      width: 80px;
+      padding: 4px 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--ink);
+      background: var(--panel);
+      outline: none;
+    }
+    .range-controls input[type="number"]:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(30,102,245,.15);
+    }
+
+    /* ============================================================
+       三列主布局：左 | 中 | 右
+       ============================================================ */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ---- 侧边栏（元数据面板） ---- */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: 180px;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 12px;
+      flex-shrink: 0;
+      resize: horizontal;
+    }
+    .sidebar h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brand-dark);
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--brand-light);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar h3 .badge {
+      font-size: 10px;
+      background: var(--brand-light);
+      color: var(--brand);
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .meta-section { margin-bottom: 12px; }
+    .meta-section h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink-light);
+      margin-bottom: 4px;
+      padding-left: 4px;
+    }
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+    .meta-table td {
+      padding: 3px 5px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      word-break: break-all;
+    }
+    .meta-table td:first-child {
+      font-weight: 600;
+      color: var(--ink-light);
+      white-space: nowrap;
+      width: 80px;
+    }
+    .meta-table td:last-child {
+      color: var(--ink);
+      font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+      font-size: 11px;
+    }
+    .meta-empty {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 16px 0;
+      text-align: center;
+    }
+    .capture-list { list-style: none; padding: 0; }
+    .capture-list li {
+      padding: 5px 6px;
+      margin-bottom: 3px;
+      border-radius: 6px;
+      background: var(--bg);
+      border-left: 3px solid var(--brand);
+      font-size: 11px;
+    }
+    .capture-list li .freq { font-weight: 700; color: var(--brand-dark); }
+    .capture-list li .start { color: var(--muted); }
+
+    /* ---- 可拖拽分割线 ---- */
+    .resizer {
+      width: var(--resizer-w);
+      cursor: col-resize;
+      background: transparent;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 5;
+      transition: background .15s;
+    }
+    .resizer:hover,
+    .resizer.active {
+      background: var(--brand-light);
+    }
+    .resizer::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 2px;
+      height: 40px;
+      background: var(--line-strong);
+      border-radius: 2px;
+    }
+
+    /* ---- 内容区（图表区域） ---- */
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 8px 10px;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    /* ---- 图表行列布局：上中下三行 ---- */
+    /* 行1：时域 + 星座（等高并排） */
+    /* 行2：PSD + 瀑布（等高并排） */
+    /* 行3：标签时间轴 */
+    .plot-row {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+    /* 第1行和第2行各占约 40% 高度，第3行占 20% */
+    .plot-row-top { flex: 4; }
+    .plot-row-mid { flex: 4; }
+    .plot-row-bottom { flex: 2; min-height: 80px; max-height: 180px; }
+
+    .plot-row .plot-card {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* 图表卡片 */
+    .plot-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .plot-card .plot-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fafcff;
+      flex-shrink: 0;
+    }
+    .plot-card .plot-header h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brand-dark);
+    }
+    .plot-card .plot-header .plot-status {
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .plot-card .plot-area {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+    .plot-card .plot-area .js-plotly-plot,
+    .plot-card .plot-area .plot-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ---- 标签时间轴专用 ---- */
+    .annot-timeline {
+      overflow-y: auto;
+      padding: 4px 8px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .annot-timeline .annot-none {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 16px;
+    }
+    /* 每个 annotation 条 */
+    .annot-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 6px;
+      border-radius: 6px;
+      background: var(--bg);
+      cursor: pointer;
+      transition: background .15s;
+      font-size: 11px;
+    }
+    .annot-bar:hover { background: var(--brand-light); }
+    .annot-bar .annot-color {
+      width: 4px;
+      height: 24px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .annot-bar .annot-label {
+      font-weight: 600;
+      color: var(--ink);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .annot-bar .annot-range {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .annot-bar .annot-freq {
+      color: var(--brand-dark);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    /* 预留的 annotation 占位结构 —— 即使无数据也可见 */
+    .annot-timeline .annot-placeholder {
+      border: 1px dashed var(--line-strong);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    /* ---- 状态栏 ---- */
+    .status-bar {
+      padding: 4px 16px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+
+    /* ---- 错误详情栏 ---- */
+    .error-bar {
+      padding: 6px 16px;
+      font-size: 11px;
+      color: var(--danger);
+      background: #fef2f2;
+      border-top: 1px solid #fecaca;
+      flex-shrink: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    /* ---- 进度指示 ---- */
+    .progress-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .progress-overlay.show { display: flex; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid var(--brand-light);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-overlay p { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+    /* ---- 视图联动指示 ---- */
+    .link-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--ok);
+      padding: 2px 6px;
+      background: #ecfdf5;
+      border-radius: 999px;
+    }
+
+    /* ---- 响应式 ---- */
+    @media (max-width: 900px) {
+      :root { --sidebar-w: 240px; }
+      .plot-row { flex-direction: column; }
+      .plot-row-top { flex: 1; }
+      .plot-row-mid { flex: 1; }
+      .plot-row-bottom { min-height: 60px; max-height: 120px; }
+    }
+    @media (max-width: 640px) {
+      .main-layout { flex-direction: column; }
+      .sidebar { width: 100%; min-width: unset; max-height: 200px; border-right: none; border-bottom: 1px solid var(--line); }
+      .resizer { display: none; }
+    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c5d3eb; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a0b5d6; }
+
+    /* ============================================================
+       P3 标注与元数据功能 — 样式
+       ============================================================ */
+    .edit-input {
+      width: 100%; padding: 3px 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px; font-size: 11px; font-family: inherit;
+      color: var(--ink); background: var(--panel);
+      outline: none; transition: border-color var(--transition);
+    }
+    .edit-input:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(30,102,245,.12);
+    }
+    .edit-input.danger { border-color: var(--danger); background: #fef2f2; }
+    .edit-select {
+      width: 100%; padding: 3px 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px; font-size: 11px; font-family: inherit;
+      color: var(--ink); background: var(--panel); outline: none;
+    }
+    .edit-select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(30,102,245,.12);
+    }
+    .inline-warn-toggle {
+      border: none;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      margin-left: 4px;
+      text-decoration: underline;
+    }
+    .annot-editor .btn-icon {
+      padding: 2px 6px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+    }
+    .annot-editor .btn-icon:hover { background: var(--brand-light); color: var(--brand); }
+    .modified-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 6px; border-radius: 999px;
+      font-size: 10px; font-weight: 700;
+      background: #fef3c7; color: #92400e;
+    }
+    /* ---- Capture 表格 ---- */
+    .capture-table {
+      width: 100%; border-collapse: collapse; font-size: 11px;
+    }
+    .capture-table th {
+      padding: 4px 6px; background: var(--brand-light);
+      color: var(--brand-dark); font-weight: 700;
+      text-align: left; border-bottom: 2px solid var(--brand);
+      white-space: nowrap;
+    }
+    .capture-table td {
+      padding: 3px 6px; border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    .capture-table tr:hover td { background: #f8faff; }
+    .capture-table .edit-input { width: 90px; padding: 2px 4px; font-size: 10px; }
+    .capture-table .btn-icon {
+      padding: 2px 6px; font-size: 10px; border: none; border-radius: 4px;
+      cursor: pointer; background: transparent; color: var(--muted);
+      transition: all .15s;
+    }
+    .capture-table .btn-icon:hover { background: var(--brand-light); color: var(--brand); }
+    .capture-table .btn-icon.danger:hover { background: #fef2f2; color: var(--danger); }
+    .capture-table .validation-error { font-size: 10px; color: var(--danger); padding: 2px 6px; }
+    /* ---- Annotation 编辑器 ---- */
+    .annot-editor {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 10px;
+      box-shadow: var(--shadow-lg); position: absolute; z-index: 50;
+      width: 320px; max-height: 420px; overflow-y: auto;
+    }
+    .annot-editor h4 {
+      font-size: 13px; font-weight: 700; color: var(--brand-dark);
+      margin-bottom: 8px; padding-bottom: 6px;
+      border-bottom: 2px solid var(--brand-light);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .annot-editor .form-row {
+      display: flex; gap: 6px; margin-bottom: 6px; align-items: center;
+    }
+    .annot-editor .form-row label {
+      font-size: 11px; font-weight: 600; color: var(--ink-light);
+      min-width: 68px; flex-shrink: 0;
+    }
+    .annot-editor .form-row .edit-input { flex: 1; }
+    .annot-editor .form-row .edit-input.small { width: 60px; flex: none; }
+    .annot-editor .form-actions {
+      display: flex; gap: 6px; margin-top: 8px;
+      padding-top: 8px; border-top: 1px solid var(--line);
+    }
+    .annot-editor .form-actions .btn { flex: 1; justify-content: center; }
+    .annot-editor .validation-msg { font-size: 10px; color: var(--danger); margin-top: 4px; }
+    /* ---- 拖拽选择覆盖层 ---- */
+    .drag-overlay {
+      position: absolute; background: rgba(30, 102, 245, 0.15);
+      border: 2px dashed var(--brand); pointer-events: none;
+      z-index: 40; display: none;
+    }
+    /* ---- 模态对话框 ---- */
+    .modal-overlay {
+      display: none; position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: var(--panel); border-radius: var(--radius);
+      box-shadow: var(--shadow-lg); padding: 20px;
+      max-width: 480px; width: 90%; max-height: 80vh; overflow-y: auto;
+    }
+    .modal-box h3 { font-size: 15px; font-weight: 700; color: var(--brand-dark); margin-bottom: 12px; }
+    .modal-box .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    /* ---- Diff 预览 ---- */
+    .diff-container {
+      max-height: 400px; overflow-y: auto;
+      font-family: "SF Mono","Cascadia Code","Consolas",monospace;
+      font-size: 11px; line-height: 1.5;
+      background: #1e293b; border-radius: 6px; padding: 10px;
+    }
+    .diff-line { padding: 1px 6px; white-space: pre-wrap; word-break: break-all; }
+    .diff-line.added { background: rgba(5,150,105,0.2); color: #a7f3d0; }
+    .diff-line.removed { background: rgba(220,38,38,0.2); color: #fca5a5; }
+    .diff-line.unchanged { color: #94a3b8; }
+    .diff-header { font-weight: 700; padding: 4px 6px; color: #e2e8f0; background: #334155; border-radius: 4px; margin-bottom: 4px; }
+    /* ---- 保存按钮组 ---- */
+    .save-group { display: flex; gap: 4px; flex-wrap: wrap; }
+    .save-group .btn { font-size: 11px; padding: 4px 8px; }
+    .btn-success { background: var(--ok); color: #fff; }
+    .btn-success:hover { background: #047857; }
+    .btn-warning { background: var(--warn); color: #fff; }
+    .btn-warning:hover { background: #b45309; }
+    .btn-danger-light { background: #fef2f2; color: var(--danger); border: 1px solid #fca5a5; }
+    .btn-danger-light:hover { background: #fee2e2; }
+    /* ---- 自定义 Key-Value ---- */
+    .kv-row { display: flex; gap: 4px; margin-bottom: 3px; align-items: center; }
+    .kv-row .edit-input { flex: 1; min-width: 0; }
+    .kv-row .edit-input.kv-key { flex: 0 0 100px; }
+    .kv-row .btn-icon {
+      padding: 2px 6px; font-size: 10px; border: none; border-radius: 4px;
+      cursor: pointer; background: transparent; color: var(--muted);
+      transition: all .15s; flex-shrink: 0;
+    }
+    .kv-row .btn-icon:hover { background: var(--brand-light); color: var(--brand); }
+    .kv-row .btn-icon.danger:hover { background: #fef2f2; color: var(--danger); }
+    /* Annotation 列表中的操作按钮 */
+    .annot-actions { display: flex; gap: 3px; flex-shrink: 0; }
+    .annot-actions .btn-icon {
+      padding: 1px 5px; font-size: 10px; border: none; border-radius: 4px;
+      cursor: pointer; background: transparent; color: var(--muted);
+      transition: all .15s;
+    }
+    .annot-actions .btn-icon:hover { background: var(--brand-light); color: var(--brand); }
+    .annot-actions .btn-icon.danger:hover { background: #fef2f2; color: var(--danger); }
+    .annot-bar.selected { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+    /* ============================================================
+       P4 RFML 就绪 — 样式
+       ============================================================ */
+    /* ---- RFML 主面板（可折叠） ---- */
+    .rfml-panel {
+      background: var(--panel);
+      border-top: 2px solid var(--brand);
+      box-shadow: 0 -2px 12px rgba(15,23,42,.06);
+      flex-shrink: 0;
+      max-height: 320px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: max-height .3s ease;
+    }
+    .rfml-panel.collapsed { max-height: 36px; }
+    .rfml-panel .rfml-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 16px;
+      background: var(--brand-light);
+      cursor: pointer;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .rfml-panel .rfml-header h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--brand-dark);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .rfml-panel .rfml-header .rfml-toggle {
+      font-size: 12px;
+      color: var(--brand);
+      transition: transform .2s;
+    }
+    .rfml-panel.collapsed .rfml-toggle { transform: rotate(-90deg); }
+    .rfml-panel .rfml-body {
+      display: flex;
+      gap: 8px;
+      padding: 6px 12px;
+      overflow-x: auto;
+      flex: 1;
+      min-height: 0;
+    }
+    /* ---- RFML 子区域卡片 ---- */
+    .rfml-card {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 6px 8px;
+      min-width: 220px;
+      max-width: 340px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .rfml-card h4 {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--brand-dark);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .rfml-card h4 .badge {
+      font-size: 9px;
+      background: var(--brand-light);
+      color: var(--brand);
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .rfml-card .rfml-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+    }
+    .rfml-card .rfml-row label {
+      font-weight: 600;
+      color: var(--ink-light);
+      white-space: nowrap;
+      min-width: 48px;
+    }
+    .rfml-card .rfml-row input[type="number"] {
+      width: 64px;
+      padding: 2px 4px;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+      color: var(--ink);
+      background: var(--panel);
+      outline: none;
+    }
+    .rfml-card .rfml-row input[type="number"]:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(30,102,245,.12);
+    }
+    .rfml-card .rfml-row input[type="text"] {
+      flex: 1;
+      padding: 2px 4px;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+    }
+    .rfml-card .rfml-row input[type="text"]:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 2px rgba(30,102,245,.12);
+    }
+    .rfml-card .rfml-btn {
+      padding: 2px 8px;
+      font-size: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: var(--brand);
+      color: #fff;
+      transition: background .15s;
+    }
+    .rfml-card .rfml-btn:hover { background: var(--brand-hover); }
+    .rfml-card .rfml-btn-sm { padding: 1px 6px; font-size: 9px; }
+    .rfml-card .rfml-btn-outline {
+      background: transparent;
+      border: 1px solid var(--line-strong);
+      color: var(--ink-light);
+    }
+    .rfml-card .rfml-btn-outline:hover {
+      background: var(--brand-light);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+    /* ---- Taxonomy 表格 ---- */
+    .taxonomy-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .taxonomy-table th {
+      padding: 2px 4px;
+      background: var(--brand-light);
+      color: var(--brand-dark);
+      font-weight: 700;
+      text-align: left;
+      border-bottom: 1px solid var(--brand);
+    }
+    .taxonomy-table td {
+      padding: 2px 4px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+    .taxonomy-table .edit-input {
+      width: 100%;
+      padding: 1px 3px;
+      font-size: 10px;
+      border: 1px solid transparent;
+      border-radius: 3px;
+      background: transparent;
+      transition: border-color .15s;
+    }
+    .taxonomy-table .edit-input:focus {
+      border-color: var(--brand);
+      background: var(--panel);
+      outline: none;
+    }
+    .taxonomy-table .taxonomy-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--brand-light);
+      position: relative;
+      overflow: hidden;
+    }
+    .taxonomy-table .taxonomy-bar .fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--brand);
+      transition: width .3s;
+    }
+    /* ---- Split 分配样式 ---- */
+    .split-dist {
+      display: flex;
+      gap: 4px;
+      font-size: 10px;
+    }
+    .split-dist .split-item {
+      flex: 1;
+      text-align: center;
+      padding: 3px 2px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .split-dist .split-item.train { background: #e3edff; color: var(--brand); }
+    .split-dist .split-item.val { background: #ecfdf5; color: var(--ok); }
+    .split-dist .split-item.test { background: #fef3c7; color: var(--warn); }
+    .split-dist .split-item .count { font-size: 9px; color: var(--muted); font-weight: 400; }
+    .split-ratio-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      font-size: 10px;
+    }
+    .split-ratio-row input[type="number"] {
+      width: 40px;
+      padding: 1px 3px;
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      font-size: 10px;
+      text-align: center;
+    }
+    .split-seed-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      font-size: 10px;
+      margin-top: 2px;
+    }
+    .split-seed-row input[type="number"] {
+      width: 60px;
+      padding: 1px 3px;
+      border: 1px solid var(--line-strong);
+      border-radius: 3px;
+      font-size: 10px;
+      text-align: center;
+    }
+    /* ---- 切片预览 ---- */
+    .slice-info {
+      font-size: 10px;
+      color: var(--ink-light);
+      padding: 2px 0;
+    }
+    .slice-info span { font-weight: 700; color: var(--brand-dark); }
+    /* ---- 质量门禁面板 ---- */
+    .gate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .gate-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+    }
+    .gate-item.pass { background: #ecfdf5; color: var(--ok); }
+    .gate-item.warn { background: #fef3c7; color: var(--warn); }
+    .gate-item.fail { background: #fef2f2; color: var(--danger); }
+    .gate-item .gate-icon { font-size: 12px; flex-shrink: 0; }
+    .gate-item .gate-label { flex: 1; }
+    .gate-item .gate-detail { font-size: 9px; color: var(--muted); }
+    .gate-summary {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 0;
+    }
+    .gate-summary.pass { color: var(--ok); }
+    .gate-summary.fail { color: var(--danger); }
+    /* ---- 进度条 ---- */
+    .progress-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--line);
+      overflow: hidden;
+      margin: 2px 0;
+    }
+    .progress-bar .fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .4s;
+    }
+    .progress-bar .fill.green { background: var(--ok); }
+    .progress-bar .fill.blue { background: var(--brand); }
+    .progress-bar .fill.orange { background: var(--warn); }
+    /* ---- P5 扩展能力：远程数据、复核、批处理、模型回看、统计 ---- */
+    .p5-panel {
+      background: #fff;
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -2px 10px rgba(15,23,42,.04);
+    }
+    .p5-header {
+      height: 38px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, #f7fbff, #ffffff);
+    }
+    .p5-header h3 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--brand);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .p5-body {
+      padding: 8px 10px 10px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(180px, 1fr));
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .p5-panel.collapsed .p5-body { display: none; }
+    .p5-panel.collapsed .p5-toggle { transform: rotate(-90deg); }
+    .p5-toggle { transition: transform .18s; color: var(--muted); }
+    .p5-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fbfdff;
+      min-width: 0;
+    }
+    .p5-card h4 {
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .p5-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      margin: 4px 0;
+      min-width: 0;
+    }
+    .p5-row label {
+      font-size: 9px;
+      color: var(--muted);
+      min-width: 38px;
+      flex-shrink: 0;
+    }
+    .p5-input, .p5-select, .p5-textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 4px 5px;
+      font-size: 10px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+    .p5-textarea { resize: vertical; min-height: 42px; }
+    .p5-btn {
+      border: 1px solid var(--brand);
+      background: var(--brand);
+      color: #fff;
+      border-radius: 5px;
+      padding: 4px 7px;
+      font-size: 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .p5-btn.outline {
+      background: #fff;
+      color: var(--brand);
+    }
+    .p5-btn.warn {
+      border-color: var(--warn);
+      background: var(--warn);
+    }
+    .p5-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .p5-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      margin-bottom: 5px;
+    }
+    .p5-kpi {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px;
+      background: #fff;
+      min-width: 0;
+    }
+    .p5-kpi .num {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--brand);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .p5-kpi .label {
+      font-size: 9px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .p5-mini-list {
+      max-height: 112px;
+      overflow: auto;
+      font-size: 9px;
+      color: var(--ink-light);
+      border-top: 1px solid var(--line);
+      margin-top: 5px;
+      padding-top: 5px;
+    }
+    .p5-mini-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 2px 0;
+      border-bottom: 1px dashed #e7edf7;
+    }
+    .p5-mini-item span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .review-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .review-badge.pending { background: #eff6ff; color: var(--brand); border-color: #bfdbfe; }
+    .review-badge.approved { background: #ecfdf5; color: var(--ok); border-color: #bbf7d0; }
+    .review-badge.rejected { background: #fef2f2; color: var(--danger); border-color: #fecaca; }
+    .prediction-bar {
+      border-style: dashed;
+      background: repeating-linear-gradient(45deg, #fff, #fff 4px, #f5f8ff 4px, #f5f8ff 8px);
+    }
+    @media (max-width: 1180px) {
+      .p5-body { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .p5-body { grid-template-columns: 1fr; max-height: 420px; }
+    }
+    /* ---- 滚动条细调 ---- */
+    .rfml-card::-webkit-scrollbar { width: 3px; }
+    .rfml-card::-webkit-scrollbar-thumb { background: #c5d3eb; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Plotly CDN 加载失败时的离线提示 -->
+<div id="plotlyFallbackMsg" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#f4f7fb;z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+  <div style="font-size:48px">📡</div>
+  <h2 style="color:#1f2a37;margin:0">RFview 无法加载</h2>
+  <p style="color:#4b5a70;max-width:360px;line-height:1.6;margin:0">
+    Plotly.js 图表库从 CDN 加载失败，请检查网络连接。
+  </p>
+  <p style="color:#6b7b8f;font-size:12px;max-width:360px;margin:0">
+    离线使用时，请下载 <code style="background:#eef1f8;padding:2px 6px;border-radius:3px">plotly.min.js</code>
+    放在 viewer.html 同级目录，并将 CDN script 标签替换为本地引用。
+  </p>
+</div>
+
+<!-- ============================================================
+     顶部导航栏
+     ============================================================ -->
+<header class="navbar">
+  <div class="logo">RFview <span>·</span> P2+P3</div>
+  <div class="controls">
+    <div class="file-picker">
+      <input type="file" id="metaFileInput" accept=".sigmf-meta,.json" />
+      <button class="btn btn-primary" id="openFileBtn">📂 选择 .sigmf-meta</button>
+      <span class="file-label" id="fileNameLabel">未选择文件</span>
+    </div>
+    <div class="range-controls">
+      <label>起始</label>
+      <input type="number" id="startSample" value="0" min="0" step="1" />
+      <label>窗口</label>
+      <input type="number" id="windowSize" value="4096" min="256" max="65536" step="256" />
+      <button class="btn btn-primary btn-sm" id="updateBtn">🔄 更新</button>
+    </div>
+    <div class="save-group">
+      <button class="btn btn-sm btn-outline" id="diffPreviewBtn" style="display:none">📋 Diff 预览</button>
+      <button class="btn btn-sm btn-warning" id="revertBtn" style="display:none">↩️ 撤销修改</button>
+      <button class="btn btn-sm btn-outline" id="overlaySaveBtn" style="display:none">💾 导出 overlay</button>
+      <button class="btn btn-sm btn-success" id="saveMetaBtn" style="display:none">💾 保存 .sigmf-meta</button>
+      <span id="modifiedIndicator" style="display:none" class="modified-badge">✏️ 已修改</span>
+    </div>
+    <span class="link-indicator" id="linkIndicator">🔗 视图已联动</span>
+  </div>
+</header>
+
+<!-- ============================================================
+     三列主布局：左(元数据面板) | 中(时域+星座) | 右(PSD+瀑布)
+     ============================================================ -->
+<div class="main-layout">
+  <!-- 左侧：元数据面板 -->
+  <aside class="sidebar" id="metaPanel">
+    <h3>📋 元数据 <span class="badge" id="metaBadge">未加载</span></h3>
+    <div id="metaContent">
+      <div class="meta-empty">请选择 .sigmf-meta 文件以查看元数据</div>
+    </div>
+  </aside>
+
+  <!-- 拖拽分割线 -->
+  <div class="resizer" id="resizer"></div>
+
+  <!-- 中间+右侧：图表区 -->
+  <main class="content">
+    <!-- 第1行：时域 + 星座图（并排等高） -->
+    <div class="plot-row plot-row-top">
+      <div class="plot-card">
+        <div class="plot-header">
+          <h4>📊 IQ 时域波形</h4>
+          <span class="plot-status" id="iqStatus">等待数据…</span>
+        </div>
+        <div class="plot-area" id="iqPlot"></div>
+      </div>
+      <div class="plot-card">
+        <div class="plot-header">
+          <h4>⚫ 星座图 (Constellation)</h4>
+          <span class="plot-status" id="constStatus">等待数据…</span>
+        </div>
+        <div class="plot-area" id="constPlot"></div>
+      </div>
+    </div>
+
+    <!-- 第2行：PSD + 瀑布图（并排等高） -->
+    <div class="plot-row plot-row-mid">
+      <div class="plot-card">
+        <div class="plot-header">
+          <h4>📈 PSD 功率谱密度</h4>
+          <span class="plot-status" id="psdStatus">等待数据…</span>
+        </div>
+        <div class="plot-area" id="psdPlot"></div>
+      </div>
+      <div class="plot-card">
+        <div class="plot-header">
+          <h4>🌊 瀑布图 (Spectrogram)</h4>
+          <span class="plot-status" id="specStatus">等待数据…</span>
+        </div>
+        <div class="plot-area" id="specPlot"></div>
+      </div>
+    </div>
+
+    <!-- 第3行：标签时间轴 -->
+    <div class="plot-row plot-row-bottom">
+      <div class="plot-card">
+        <div class="plot-header">
+          <h4>🏷️ 标签时间轴 (Annotation Timeline)</h4>
+          <span class="plot-status" id="annotStatus">等待数据…</span>
+        </div>
+        <div class="annot-timeline" id="annotTimeline">
+          <div class="annot-placeholder">📌 加载数据后，annotation 片段将在此处显示为彩色时间条</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 状态栏 -->
+<div class="status-bar" id="statusBar">🟢 就绪 · 请选择 SigMF 文件</div>
+<!-- 错误详情栏（默认隐藏，catch 时显示） -->
+<div class="error-bar" id="errorBar" style="display:none"></div>
+
+<!-- P3 模态对话框：Diff 预览 -->
+<div class="modal-overlay" id="diffModal">
+  <div class="modal-box">
+    <h3>📋 修改差异预览</h3>
+    <div id="diffContent" class="diff-container"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="diffCloseBtn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- P3 模态对话框：确认删除/操作 -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box" style="max-width:380px">
+    <h3 id="confirmTitle">⚠️ 确认操作</h3>
+    <p id="confirmMessage" style="font-size:13px;color:var(--ink-light);margin-bottom:8px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="confirmCancelBtn">取消</button>
+      <button class="btn btn-danger-light" id="confirmOkBtn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 加载进度遮盖 -->
+<div class="progress-overlay" id="progressOverlay">
+  <div class="spinner"></div>
+  <p>正在读取和解析数据…</p>
+</div>
+
+<!-- ============================================================
+     P4 RFML 就绪 — 面板
+     ============================================================ -->
+<div class="rfml-panel" id="rfmlPanel">
+  <div class="rfml-header" id="rfmlHeader">
+    <h3>📡 RFML 就绪 <span style="font-weight:400;font-size:11px;color:var(--ink-light)">Taxonomy · Split · 切片 · 导出 · 门禁</span></h3>
+    <span class="rfml-toggle">▼</span>
+  </div>
+  <div class="rfml-body" id="rfmlBody">
+    <!-- 卡片1：Taxonomy 管理 -->
+    <div class="rfml-card" id="taxonomyCard">
+      <h4>🏷️ Taxonomy <span class="badge" id="taxonomyCount">0</span></h4>
+      <div id="taxonomyContent" style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">加载数据后自动构建类别列表</div>
+    </div>
+    <!-- 卡片2：Split 分配 -->
+    <div class="rfml-card" id="splitCard">
+      <h4>📊 Split 分配</h4>
+      <div id="splitContent" style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">加载数据后计算 Split 分布</div>
+    </div>
+    <!-- 卡片3：切片预览 -->
+    <div class="rfml-card" id="sliceCard">
+      <h4>🔪 切片预览</h4>
+      <div id="sliceContent" style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">配置切片参数后自动生成</div>
+    </div>
+    <!-- 卡片4：Manifest 导出 -->
+    <div class="rfml-card" id="manifestCard">
+      <h4>📦 Manifest 导出</h4>
+      <div id="manifestContent" style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">通过质量门禁后即可导出</div>
+    </div>
+    <!-- 卡片5：质量门禁 -->
+    <div class="rfml-card" id="gateCard">
+      <h4>✅ 质量门禁</h4>
+      <div id="gateContent" style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">导出前自动运行门禁检查</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     P5 扩展能力 — 远程数据、多人复核、批处理、模型回看、统计摘要
+     ============================================================ -->
+<div class="p5-panel collapsed" id="p5Panel">
+  <div class="p5-header" id="p5Header">
+    <h3>🧩 P5 扩展能力 <span style="font-weight:400;font-size:11px;color:var(--ink-light)">Remote · Review · Batch · Prediction · Stats</span></h3>
+    <span class="p5-toggle">▼</span>
+  </div>
+  <div class="p5-body" id="p5Body">
+    <div class="p5-card">
+      <h4>🌐 远程数据加载</h4>
+      <div class="p5-row"><label>Meta URL</label><input class="p5-input" id="remoteMetaUrl" placeholder="https://host/data.sigmf-meta" /></div>
+      <div class="p5-row"><label>Data URL</label><input class="p5-input" id="remoteDataUrl" placeholder="https://host/data.sigmf-data" /></div>
+      <div class="p5-row">
+        <button class="p5-btn" id="loadRemoteBtn">加载远程 SigMF</button>
+        <button class="p5-btn outline" id="deriveDataUrlBtn">推断 Data URL</button>
+      </div>
+      <div id="remoteStatus" style="font-size:9px;color:var(--muted);line-height:1.4">远程服务器需允许浏览器 CORS 访问。</div>
+    </div>
+
+    <div class="p5-card">
+      <h4>👥 多人复核 <span class="badge" id="reviewBadge">0/0</span></h4>
+      <div class="p5-row"><label>复核人</label><input class="p5-input" id="reviewerInput" placeholder="reviewer" /></div>
+      <div class="p5-row"><label>批量</label><select class="p5-select" id="bulkReviewStatus"><option value="approved">approved</option><option value="rejected">rejected</option><option value="pending">pending</option></select></div>
+      <textarea class="p5-textarea" id="bulkReviewNote" placeholder="复核备注"></textarea>
+      <div class="p5-row">
+        <button class="p5-btn" id="applyBulkReviewBtn">应用到全部</button>
+        <button class="p5-btn outline" id="applyVisibleReviewBtn">仅当前窗口</button>
+      </div>
+      <div id="reviewContent" class="p5-mini-list">加载标注后显示复核状态。</div>
+    </div>
+
+    <div class="p5-card">
+      <h4>📚 批处理导出</h4>
+      <div class="p5-kpi-grid">
+        <div class="p5-kpi"><div class="num" id="batchAssetCount">0</div><div class="label">会话资产</div></div>
+        <div class="p5-kpi"><div class="num" id="batchManifestCount">0</div><div class="label">Manifest 行</div></div>
+      </div>
+      <div class="p5-row">
+        <button class="p5-btn" id="addBatchAssetBtn">加入批处理</button>
+        <button class="p5-btn outline" id="clearBatchBtn">清空</button>
+      </div>
+      <div class="p5-row">
+        <button class="p5-btn outline" id="exportBatchManifestBtn">导出 Manifest</button>
+        <button class="p5-btn outline" id="exportBatchReportBtn">导出质量报告</button>
+      </div>
+      <div id="batchContent" class="p5-mini-list">尚未加入资产。</div>
+    </div>
+
+    <div class="p5-card">
+      <h4>🤖 模型回看</h4>
+      <div class="p5-row"><label>预测 Meta</label><input type="file" id="predictionFileInput" accept=".sigmf-meta,.json" style="display:none" /><button class="p5-btn outline" id="loadPredictionBtn">加载预测标注</button></div>
+      <div class="p5-row"><button class="p5-btn outline" id="clearPredictionBtn">清除预测</button><button class="p5-btn outline" id="exportCompareBtn">导出对比</button></div>
+      <div id="predictionContent" class="p5-mini-list">可加载第二个 SigMF meta，作为模型预测叠加到时间轴。</div>
+    </div>
+
+    <div class="p5-card">
+      <h4>📊 统计摘要</h4>
+      <div id="statsContent">加载数据后显示标签、SNR、时长与复核统计。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     JavaScript — 核心逻辑（P2/P3/P4：可视化、元数据编辑、RFML 导出）
+     ============================================================ -->
+<script>
+(function () {
+  'use strict';
+
+  // Plotly 加载失败保护：如果 Plotly 未定义，显示离线提示并阻止后续初始化
+  if (typeof Plotly === 'undefined') {
+    const fb = document.getElementById('plotlyFallbackMsg');
+    if (fb) fb.style.display = 'flex';
+    console.error('RFview: Plotly.js 未加载（CDN 可能不可达）');
+    return;
+  }
+
+  /* ===================================================================
+     常量 & DOM 引用
+     =================================================================== */
+  const SAMPLE_BYTES = 8;           // cf32_le: I=float32(4) + Q=float32(4)
+  const FFT_SIZE    = 1024;         // FFT / Welch 参数
+  const OVERLAP     = 0.5;          // 50% 重叠
+  const SPEC_NFFT   = 512;          // 瀑布图 FFT 大小
+  const SPEC_HOP    = 256;          // 瀑布图跳步
+
+  // DOM 引用
+  const metaFileInput   = document.getElementById('metaFileInput');
+  const openFileBtn     = document.getElementById('openFileBtn');
+  const fileNameLabel   = document.getElementById('fileNameLabel');
+  const startSampleInput= document.getElementById('startSample');
+  const windowSizeInput = document.getElementById('windowSize');
+  const updateBtn       = document.getElementById('updateBtn');
+  const metaContent     = document.getElementById('metaContent');
+  const metaBadge       = document.getElementById('metaBadge');
+  const statusBar       = document.getElementById('statusBar');
+  const errorBar        = document.getElementById('errorBar');
+  const progressOverlay = document.getElementById('progressOverlay');
+  const iqPlotDiv       = document.getElementById('iqPlot');
+  const constPlotDiv    = document.getElementById('constPlot');
+  const psdPlotDiv      = document.getElementById('psdPlot');
+  const specPlotDiv     = document.getElementById('specPlot');
+  const annotTimeline   = document.getElementById('annotTimeline');
+  const iqStatus        = document.getElementById('iqStatus');
+  const constStatus     = document.getElementById('constStatus');
+  const psdStatus       = document.getElementById('psdStatus');
+  const specStatus      = document.getElementById('specStatus');
+  const annotStatus     = document.getElementById('annotStatus');
+  const linkIndicator   = document.getElementById('linkIndicator');
+  const resizer         = document.getElementById('resizer');
+
+  // P3 按钮 & 模态框 DOM 引用
+  const diffPreviewBtn  = document.getElementById('diffPreviewBtn');
+  const revertBtn       = document.getElementById('revertBtn');
+  const overlaySaveBtn  = document.getElementById('overlaySaveBtn');
+  const saveMetaBtn     = document.getElementById('saveMetaBtn');
+  const modifiedIndicator = document.getElementById('modifiedIndicator');
+  const diffModal       = document.getElementById('diffModal');
+  const diffContent     = document.getElementById('diffContent');
+  const diffCloseBtn    = document.getElementById('diffCloseBtn');
+  const confirmModal    = document.getElementById('confirmModal');
+  const confirmTitle    = document.getElementById('confirmTitle');
+  const confirmMessage  = document.getElementById('confirmMessage');
+  const confirmCancelBtn= document.getElementById('confirmCancelBtn');
+  const confirmOkBtn    = document.getElementById('confirmOkBtn');
+
+  // Plotly 图表 ID 列表（用于统一 resize）
+  const ALL_PLOT_DIVS = [iqPlotDiv, constPlotDiv, psdPlotDiv, specPlotDiv];
+
+  /* ===================================================================
+     全局状态
+     =================================================================== */
+  let currentMeta   = null;        // 解析后的元数据对象
+  let currentData   = null;        // ArrayBuffer（完整 IQ 数据）
+  let sampleCount   = 0;           // 总样本数
+  let sampleRate    = 0;           // 采样率 (Hz)
+  let dataFileName  = '';          // .sigmf-data 文件名
+  let captures      = [];          // capture segments
+  let annotations   = [];          // annotation 列表
+  let currentI      = null;        // 当前窗口 I 数据（供联动用）
+  let currentQ      = null;        // 当前窗口 Q 数据
+  let currentFs     = 0;           // 当前采样率
+  let currentOffset = 0;           // 当前起始样本序号
+  // 用于防止循环触发联动
+  let relayoutBusy = false;
+
+  // P3 状态：原始备份与修改追踪
+  let originalMeta  = null;        // 原始 meta 深拷贝（用于 diff 和 revert）
+  let hasMods       = false;       // 是否有未保存修改
+  let metaFileName  = '';          // 原始 .sigmf-meta 文件名
+
+  // Annotation 编辑浮窗
+  let annotEditorDiv = null;       // 当前 annotation 编辑浮窗 DOM
+  let editingAnnotIdx = -1;        // 正在编辑的 annotation 索引
+
+  /* ===================================================================
+     工具函数
+     =================================================================== */
+
+  /** 格式化频率 (Hz → 可读字符串) */
+  function fmtFreq(hz) {
+    if (hz === undefined || hz === null) return '—';
+    const value = toFiniteNumber(hz, NaN);
+    if (!Number.isFinite(value)) return '—';
+    if (value >= 1e9) return (value / 1e9).toFixed(3) + ' GHz';
+    if (value >= 1e6) return (value / 1e6).toFixed(2) + ' MHz';
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + ' kHz';
+    return value.toFixed(0) + ' Hz';
+  }
+
+  /** 格式化大数字 */
+  function fmtNum(n) {
+    if (n === undefined || n === null) return '—';
+    return n.toLocaleString('zh-CN');
+  }
+
+  /** 转为有限数字；失败时返回 fallback，避免字符串数字比较和 NaN 污染校验。 */
+  function toFiniteNumber(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  /** 十六进制颜色转 rgba，用于 Plotly overlay 透明填充。 */
+  function hexToRgba(hex, alpha) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return `rgba(30,102,245,${alpha})`;
+    const intVal = parseInt(m[1], 16);
+    const r = (intVal >> 16) & 255;
+    const g = (intVal >> 8) & 255;
+    const b = intVal & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  /** SigMF 兼容：统一取得 global/captures/annotations，并回写缺失的标准容器。 */
+  function normalizeSigMFMeta(meta) {
+    if (!meta || typeof meta !== 'object') return meta;
+    if (!meta.global && meta['core:global']) meta.global = meta['core:global'];
+    if (!Array.isArray(meta.captures)) meta.captures = [];
+    if (!Array.isArray(meta.annotations)) meta.annotations = [];
+    return meta;
+  }
+
+  /** 设置状态栏消息，同时将错误详情显示在 errorBar */
+  function setStatus(msg, type) {
+    const prefix = type === 'ok' ? '🟢' : type === 'err' ? '🔴' : type === 'warn' ? '🟡' : '💡';
+    // 用户可控内容（文件名、错误消息、metadata 字段）统一走 textContent，避免状态栏 XSS。
+    statusBar.textContent = `${prefix} ${msg}`;
+    // 错误信息同时显示在 errorBar
+    if (type === 'err' && errorBar) {
+      errorBar.textContent = '❌ ' + msg;
+      errorBar.style.display = 'block';
+    } else if (errorBar) {
+      errorBar.style.display = 'none';
+    }
+  }
+
+  /** 显示/隐藏加载遮罩 */
+  function showProgress(show) {
+    progressOverlay.classList.toggle('show', show);
+  }
+
+  /** 更新图表状态文本 */
+  function setPlotStatus(el, text, ok) {
+    el.textContent = text;
+    el.style.color = ok ? 'var(--ok)' : 'var(--muted)';
+  }
+
+  /* ===================================================================
+     读取 SigMF 元数据文件
+     =================================================================== */
+
+  function loadMetaFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const meta = JSON.parse(e.target.result);
+          resolve(meta);
+        } catch (err) {
+          reject(new Error('元数据 JSON 解析失败: ' + err.message));
+        }
+      };
+      reader.onerror = () => reject(new Error('读取元数据文件失败'));
+      reader.readAsText(file);
+    });
+  }
+
+  /* ===================================================================
+     读取二进制 IQ 数据文件 (cf32_le)
+     =================================================================== */
+
+  function loadDataFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('读取 IQ 数据文件失败'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /**
+   * 从 ArrayBuffer 解码 cf32_le 样本
+   */
+  function decodeCF32(buffer, start, count) {
+    const byteOffset = start * SAMPLE_BYTES;
+    const byteCount  = count * SAMPLE_BYTES;
+    if (byteOffset + byteCount > buffer.byteLength) {
+      throw new Error(`超出数据范围: 请求 ${start+count} 样本，合计仅 ${buffer.byteLength / SAMPLE_BYTES} 样本`);
+    }
+      const view = new DataView(buffer, byteOffset, byteCount);
+    const i = new Float32Array(count);
+    const q = new Float32Array(count);
+    for (let idx = 0; idx < count; idx++) {
+      const off = idx * 8;
+      i[idx] = view.getFloat32(off, true);
+      q[idx] = view.getFloat32(off + 4, true);
+    }
+    return { i, q };
+  }
+
+  /* ===================================================================
+     Welch 法 PSD 估计
+     =================================================================== */
+
+  function welchPSD(i, q, fs, nfft, overlap) {
+    nfft    = nfft || FFT_SIZE;
+    overlap = overlap !== undefined ? overlap : OVERLAP;
+
+    const N = i.length;
+    const hop = Math.round(nfft * (1 - overlap));
+    const numSegments = Math.max(1, Math.floor((N - nfft) / hop) + 1);
+
+    const window = new Float64Array(nfft);
+    const windowPower = new Float64Array(nfft);
+    for (let w = 0; w < nfft; w++) {
+      window[w] = 0.5 * (1 - Math.cos(2 * Math.PI * w / (nfft - 1)));
+      windowPower[w] = window[w] * window[w];
+    }
+    const winScale = 1.0 / (windowPower.reduce((a, b) => a + b, 0) / nfft);
+
+    const psdSum = new Float64Array(nfft);
+    for (let seg = 0; seg < numSegments; seg++) {
+      const off = seg * hop;
+      const re = new Float64Array(nfft);
+      const im = new Float64Array(nfft);
+      for (let w = 0; w < nfft; w++) {
+        // 窗口短于 NFFT 时补零，避免 undefined 进入 FFT 后整幅图变 NaN。
+        re[w] = (i[off + w] || 0) * window[w];
+        im[w] = (q[off + w] || 0) * window[w];
+      }
+      fft(re, im);
+      for (let k = 0; k < nfft; k++) {
+        psdSum[k] += (re[k] * re[k] + im[k] * im[k]);
+      }
+    }
+
+    // 检测是否为复信号（Q 路有非零值）
+    let isComplex = false;
+    for (let s = 0; s < Math.min(N, 64); s++) {
+      if (q[s] !== 0) { isComplex = true; break; }
+    }
+
+    const scale = winScale / (numSegments * fs * nfft);
+
+    if (isComplex) {
+      // 复信号：返回 fftshift 后的全频段 [-fs/2, fs/2)
+      const freq = new Float64Array(nfft);
+      const psd  = new Float64Array(nfft);
+      for (let k = 0; k < nfft; k++) {
+        const src = (k + (nfft >>> 1)) % nfft;
+        freq[k] = fs * k / nfft - fs / 2;
+        psd[k]  = 10 * Math.log10(psdSum[src] * scale + 1e-30);
+      }
+      return { freq, psd, isComplex: true };
+    } else {
+      // 实信号：返回单边正频率 [0, fs/2]
+      const nfftHalf = nfft >>> 1;
+      const freq = new Float64Array(nfftHalf);
+      const psd  = new Float64Array(nfftHalf);
+      for (let k = 0; k < nfftHalf; k++) {
+        freq[k] = fs * k / nfft;
+        psd[k]  = 10 * Math.log10(psdSum[k] * scale + 1e-30);
+      }
+      return { freq, psd, isComplex: false };
+    }
+  }
+
+  /* ===================================================================
+     频谱图（用于瀑布图）
+     =================================================================== */
+
+  function computeSpectrogram(i, q, fs, nfft, hop) {
+    nfft = nfft || SPEC_NFFT;
+    hop  = hop  || SPEC_HOP;
+    const N = i.length;
+    const numCols = Math.max(1, Math.floor((N - nfft) / hop) + 1);
+    const nfftHalf = nfft >>> 1;
+
+    let isComplex = false;
+    for (let s = 0; s < Math.min(N, 64); s++) {
+      if (q[s] !== 0) { isComplex = true; break; }
+    }
+    const nFreq = isComplex ? nfft : nfftHalf;
+
+    const window = new Float64Array(nfft);
+    for (let w = 0; w < nfft; w++) {
+      window[w] = 0.5 * (1 - Math.cos(2 * Math.PI * w / (nfft - 1)));
+    }
+
+    const time  = new Float64Array(numCols);
+    const freq  = new Float64Array(nFreq);
+    const spec  = [];
+
+    for (let k = 0; k < nFreq; k++) {
+      freq[k] = isComplex ? (fs * k / nfft - fs / 2) : (fs * k / nfft);
+    }
+
+    for (let col = 0; col < numCols; col++) {
+      const off = col * hop;
+      time[col] = off / fs;
+
+      const re = new Float64Array(nfft);
+      const im = new Float64Array(nfft);
+      for (let w = 0; w < nfft; w++) {
+        // 与 PSD 一致，短窗口补零，避免热力图出现 NaN。
+        re[w] = (i[off + w] || 0) * window[w];
+        im[w] = (q[off + w] || 0) * window[w];
+      }
+      fft(re, im);
+
+      const power = new Float64Array(nFreq);
+      for (let k = 0; k < nFreq; k++) {
+        const src = isComplex ? ((k + nfftHalf) % nfft) : k;
+        power[k] = 10 * Math.log10(re[src] * re[src] + im[src] * im[src] + 1e-30);
+      }
+      spec.push(power);
+    }
+
+    return { time, freq, spec };
+  }
+
+  /* ===================================================================
+     Cooley-Tukey FFT
+     =================================================================== */
+
+  function fft(re, im) {
+    const N = re.length;
+    let bits = Math.round(Math.log2(N));
+    for (let i = 0; i < N; i++) {
+      let j = 0;
+      for (let b = 0; b < bits; b++) {
+        j = (j << 1) | ((i >> b) & 1);
+      }
+      if (j > i) {
+        [re[i], re[j]] = [re[j], re[i]];
+        [im[i], im[j]] = [im[j], im[i]];
+      }
+    }
+
+    for (let len = 2; len <= N; len <<= 1) {
+      const half = len >>> 1;
+      const wRe = new Float64Array(half);
+      const wIm = new Float64Array(half);
+      for (let k = 0; k < half; k++) {
+        const angle = -2 * Math.PI * k / len;
+        wRe[k] = Math.cos(angle);
+        wIm[k] = Math.sin(angle);
+      }
+      for (let i = 0; i < N; i += len) {
+        for (let j = 0; j < half; j++) {
+          const tRe = wRe[j] * re[i + j + half] - wIm[j] * im[i + j + half];
+          const tIm = wRe[j] * im[i + j + half] + wIm[j] * re[i + j + half];
+          re[i + j + half] = re[i + j] - tRe;
+          im[i + j + half] = im[i + j] - tIm;
+          re[i + j] += tRe;
+          im[i + j] += tIm;
+        }
+      }
+    }
+  }
+
+  /* ===================================================================
+     渲染元数据面板
+     =================================================================== */
+
+  function renderMetaPanel(meta) {
+    meta = normalizeSigMFMeta(meta);
+    if (!meta) {
+      metaContent.innerHTML = '<div class="meta-empty">请选择 .sigmf-meta 文件以查看元数据</div>';
+      metaBadge.textContent = '未加载';
+      return;
+    }
+
+    const global   = meta.global || {};
+    const captures = meta.captures || [];
+    const annots   = meta.annotations || [];
+
+    // SigMF 字段读取必须使用 ??，避免 0 Hz、0 samples 或空字符串被 || 误判为缺失。
+    const datatype  = global['core:datatype'] ?? global['datatype'] ?? '—';
+    const srate     = global['core:sample_rate'] ?? global['sample_rate'] ?? 0;
+    const hw        = global['core:hw'] ?? global['hw'] ?? '—';
+    const author    = global['core:author'] ?? global['author'] ?? '—';
+    const desc      = global['core:description'] ?? global['description'] ?? '—';
+    const version   = global['core:version'] ?? global['version'] ?? '—';
+    const numChan   = global['core:num_channels'] ?? global['num_channels'] ?? 1;
+    const declaredLen = global['core:sample_count'] ?? global['traceability:sample_length'] ?? global['sample_count'] ?? '—';
+    const actualLen = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : '—';
+    const centerFreq = global['core:frequency'] ?? global['frequency'] ?? null;
+
+    let html = '';
+
+    html += '<div class="meta-section">';
+    html += '<h4>📌 全局信息</h4>';
+    html += '<table class="meta-table">';
+    html += `<tr><td>数据类型</td><td>${escHtml(datatype)}</td></tr>`;
+    html += `<tr><td>采样率</td><td>${fmtFreq(srate)}/s</td></tr>`;
+    html += `<tr><td>中心频率</td><td>${fmtFreq(centerFreq)}</td></tr>`;
+    html += `<tr><td>通道数</td><td>${escHtml(String(numChan))}</td></tr>`;
+    html += `<tr><td>版本</td><td>${escHtml(version)}</td></tr>`;
+    html += `<tr><td>声明样本数</td><td>${declaredLen === '—' ? '—' : fmtNum(toFiniteNumber(declaredLen, declaredLen))}</td></tr>`;
+    html += `<tr><td>实际样本数</td><td>${fmtNum(typeof actualLen === 'number' ? actualLen : 0)}</td></tr>`;
+    html += `<tr><td>硬件</td><td>${escHtml(hw)}</td></tr>`;
+    html += `<tr><td>作者</td><td>${escHtml(author)}</td></tr>`;
+    if (desc !== '—') html += `<tr><td>描述</td><td style="word-break:break-word">${escHtml(desc)}</td></tr>`;
+    html += '</table>';
+    html += '</div>';
+
+    html += '<div class="meta-section">';
+    html += `<h4>🎯 Capture 段 <span class="badge" style="background:var(--brand-light);color:var(--brand);padding:1px 8px;border-radius:999px;font-size:10px">${captures.length}</span></h4>`;
+    if (captures.length === 0) {
+      html += '<div class="meta-empty">无 capture 段</div>';
+    } else {
+      html += '<ul class="capture-list">';
+      for (const cap of captures) {
+        const start = cap['core:sample_start'] ?? cap['sample_start'] ?? 0;
+        const freq  = cap['core:frequency'] ?? cap['frequency'] ?? null;
+        const dt    = cap['core:datetime'] ?? cap['datetime'] ?? '';
+        html += `<li><span class="freq">${fmtFreq(freq)}</span> · <span class="start">#${fmtNum(start)}</span>`;
+        if (dt) html += `<br><span style="color:var(--muted);font-size:10px">${escHtml(dt)}</span>`;
+        html += '</li>';
+      }
+      html += '</ul>';
+    }
+    html += '</div>';
+
+    html += '<div class="meta-section">';
+    html += `<h4>🏷️ Annotations <span class="badge" style="background:var(--brand-light);color:var(--brand);padding:1px 8px;border-radius:999px;font-size:10px">${annots.length}</span></h4>`;
+    if (annots.length === 0) {
+      html += '<div class="meta-empty">无标注</div>';
+    } else {
+      html += '<table class="meta-table">';
+      for (const ann of annots.slice(0, 10)) {
+        const start = ann['core:sample_start'] ?? ann['sample_start'] ?? 0;
+        const count = ann['core:sample_count'] ?? ann['sample_count'] ?? '—';
+        const label = ann['core:label'] ?? ann['label'] ?? '—';
+        html += `<tr><td>#${fmtNum(start)}</td><td>${escHtml(label)} (${escHtml(String(count))})</td></tr>`;
+      }
+      if (annots.length > 10) {
+        html += `<tr><td colspan="2" style="color:var(--muted)">…还有 ${annots.length - 10} 条</td></tr>`;
+      }
+      html += '</table>';
+    }
+    html += '</div>';
+
+    metaContent.innerHTML = html;
+    metaBadge.textContent = `${captures.length} cap · ${annots.length} ann`;
+  }
+
+  /* ===================================================================
+     Plotly 绘图函数
+     =================================================================== */
+
+  /** Plotly 通用布局配置 */
+  function plotlyLayout(title, xLabel, yLabel, extra) {
+    return Object.assign({
+      title: {
+        text: title,
+        font: { size: 13, color: '#1f2a37' },
+        x: 0.02,
+        xref: 'container',
+        y: 0.93,
+      },
+      margin: { l: 52, r: 14, t: 32, b: 40 },
+      paper_bgcolor: '#ffffff',
+      plot_bgcolor: '#fafcff',
+      font: { family: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif', size: 11, color: '#4b5a70' },
+      xaxis: {
+        title: { text: xLabel, font: { size: 11, color: '#6b7b8f' } },
+        gridcolor: '#eef1f8',
+        zerolinecolor: '#d0d9eb',
+        linecolor: '#c5d3eb',
+      },
+      yaxis: {
+        title: { text: yLabel, font: { size: 11, color: '#6b7b8f' } },
+        gridcolor: '#eef1f8',
+        zerolinecolor: '#d0d9eb',
+        linecolor: '#c5d3eb',
+      },
+      hovermode: 'closest',
+      dragmode: 'zoom',
+    }, extra || {});
+  }
+
+  /* ================================================================
+     视图联动核心逻辑
+     ================================================================ */
+
+  /** 注册 Plotly relayout 事件以实现视图联动 */
+  function registerPlotlyLinking() {
+    const linkPlots = [
+      { div: iqPlotDiv,   type: 'iq' },
+      { div: constPlotDiv, type: 'const' },
+      { div: psdPlotDiv,  type: 'psd' },
+      { div: specPlotDiv, type: 'spec' },
+    ];
+
+    linkPlots.forEach(({ div, type }) => {
+      div.on('plotly_relayout', (eventData) => {
+        if (relayoutBusy) return;
+        relayoutBusy = true;
+
+        try {
+          // 从 relayout 事件中提取 x 轴范围
+          const xRange = eventData['xaxis.range[0]'] !== undefined
+            ? [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']]
+            : (eventData['xaxis.autorange'] ? null : null);
+          const yRange = eventData['yaxis.range[0]'] !== undefined
+            ? [eventData['yaxis.range[0]'], eventData['yaxis.range[1]']]
+            : null;
+
+          if (xRange || (type === 'spec' && yRange)) {
+            // 将 x 轴范围同步到 IQ 时域图和瀑布图
+            // IQ 时域 x 轴是时间（秒），瀑布图 x 轴也是时间（秒）
+            // 星座图不需要时间范围同步
+            // PSD 同步频率范围到瀑布图
+            const syncTargets = [];
+
+            if (type === 'iq' || type === 'spec') {
+              // 时间范围：IQ 和 瀑布图同步
+              if (xRange) {
+                syncTargets.push({ div: iqPlotDiv, range: xRange });
+                syncTargets.push({ div: specPlotDiv, range: xRange });
+              }
+            }
+
+            if (type === 'psd' || type === 'spec') {
+              // 频率范围：PSD 的 x 轴与瀑布图的 y 轴同步；瀑布图 y 轴反向同步到 PSD x 轴。
+              if (type === 'psd' && xRange) {
+                syncTargets.push({ div: specPlotDiv, yRange: [xRange[0], xRange[1]] });
+              } else if (type === 'spec' && yRange) {
+                syncTargets.push({ div: psdPlotDiv, range: [yRange[0], yRange[1]] });
+              }
+            }
+
+            syncTargets.forEach(({ div, range, yRange }) => {
+              const update = {};
+              if (range) {
+                update['xaxis.range[0]'] = range[0];
+                update['xaxis.range[1]'] = range[1];
+              }
+              if (yRange) {
+                update['yaxis.range[0]'] = yRange[0];
+                update['yaxis.range[1]'] = yRange[1];
+              }
+              if (Object.keys(update).length > 0) {
+                Plotly.relayout(div, update);
+              }
+            });
+
+            // 更新采样范围输入框（从时间反推样本序号）
+            if (xRange && (type === 'iq' || type === 'spec')) {
+              if (currentFs > 0) {
+                const newStart = Math.max(0, Math.floor(xRange[0] * currentFs));
+                startSampleInput.value = String(newStart);
+              }
+            }
+          }
+        } catch (e) {
+          // 忽略 Plotly relayout 中的非关键错误
+        } finally {
+          // 延迟释放锁，避免循环触发
+          setTimeout(() => { relayoutBusy = false; }, 100);
+        }
+      });
+    });
+  }
+
+  /* ================================================================
+     星座图绘制
+     ================================================================ */
+
+  /**
+   * 绘制星座图 (Constellation Diagram)
+   * 使用散点图 + 密度着色，显示 I vs Q
+   */
+  function plotConstellation(i, q) {
+    const N = i.length;
+    // 如果样本太多，降采样到最多 20000 点以保证性能
+    const maxPoints = 20000;
+    let plotI, plotQ;
+    if (N > maxPoints) {
+      const step = Math.ceil(N / maxPoints);
+      plotI = [];
+      plotQ = [];
+      for (let n = 0; n < N; n += step) {
+        plotI.push(i[n]);
+        plotQ.push(q[n]);
+      }
+    } else {
+      plotI = Array.from(i);
+      plotQ = Array.from(q);
+    }
+
+    // 使用 scattergl 实现高性能散点图
+    const trace = {
+      x: plotI,
+      y: plotQ,
+      type: 'scattergl',
+      mode: 'markers',
+      marker: {
+        size: 2.5,
+        color: 'rgba(30, 102, 245, 0.5)',
+        line: { width: 0 },
+      },
+      hoverinfo: 'x+y',
+      name: 'I/Q 样本',
+    };
+
+    // 辅助：计算理论圆半径（用于参考网格）
+    const maxAmp = Math.max(
+      Math.abs(Math.max(...plotI)), Math.abs(Math.min(...plotI)),
+      Math.abs(Math.max(...plotQ)), Math.abs(Math.min(...plotQ))
+    );
+    const range = Math.max(1.2, maxAmp * 1.3);
+
+    const layout = plotlyLayout(
+      '星座图 (I vs Q)',
+      'I (实部)', 'Q (虚部)',
+      {
+        dragmode: 'zoom',
+        hovermode: 'closest',
+        xaxis: {
+          title: { text: 'I (实部)', font: { size: 11, color: '#6b7b8f' } },
+          range: [-range, range],
+          gridcolor: '#eef1f8',
+          zerolinecolor: '#d0d9eb',
+          linecolor: '#c5d3eb',
+          scaleanchor: 'y',       // 保持 I/Q 轴比例一致
+          scaleratio: 1,
+        },
+        yaxis: {
+          title: { text: 'Q (虚部)', font: { size: 11, color: '#6b7b8f' } },
+          range: [-range, range],
+          gridcolor: '#eef1f8',
+          zerolinecolor: '#d0d9eb',
+          linecolor: '#c5d3eb',
+        },
+        shapes: [
+          // 添加单位圆参考线
+          {
+            type: 'circle',
+            xref: 'x', yref: 'y',
+            x0: -1, y0: -1, x1: 1, y1: 1,
+            line: { color: 'rgba(107, 123, 143, 0.3)', width: 1, dash: 'dash' },
+          },
+        ],
+      }
+    );
+
+    Plotly.react(constPlotDiv, [trace], layout, { responsive: true, displayModeBar: false });
+    setPlotStatus(constStatus, `${plotI.length} 点`, true);
+  }
+
+  /* ================================================================
+     标签时间轴渲染
+     ================================================================ */
+
+  /**
+   * 渲染标签时间轴 (Annotation Timeline)
+   * 即使当前数据没有 annotation，也显示预留 UI 结构
+   */
+  function renderAnnotationTimeline(annots, sampleOffset, windowSize, fs) {
+    if (!annots || annots.length === 0) {
+      const predVisible = appendPredictionTimelineBars(sampleOffset, windowSize);
+      if (predVisible.html) {
+        annotTimeline.innerHTML = predVisible.html;
+        setPlotStatus(annotStatus, `${predVisible.count} 条预测可见 · 无人工真值`, true);
+        return;
+      }
+      // 无 annotation 时展示占位结构
+      annotTimeline.innerHTML = `
+        <div class="annot-placeholder">
+          📌 当前数据没有 annotation 标注。<br>
+          <span style="font-size:10px;color:var(--muted)">
+            加载包含 annotations 的 SigMF 文件后，标注片段将在此处以彩色时间条展示。
+          </span>
+        </div>
+      `;
+      setPlotStatus(annotStatus, '0 条标注', false);
+      return;
+    }
+
+    // annotation 颜色映射
+    const colorPalette = [
+      '#1e66f5', '#059669', '#d97706', '#dc2626', '#7c3aed',
+      '#0d9488', '#0284c7', '#9333ea', '#ea580c', '#0891b2',
+    ];
+
+    let html = '';
+    let visibleCount = 0;
+
+    for (let idx = 0; idx < annots.length; idx++) {
+      const ann = annots[idx];
+      const start = ann['core:sample_start'] ?? ann['sample_start'] ?? 0;
+      const count = ann['core:sample_count'] ?? ann['sample_count'] ?? 0;
+      const label = ann['core:label'] ?? ann['label'] ?? `标注 #${idx + 1}`;
+      const freqLower = ann['core:freq_lower_edge'] ?? ann['freq_lower_edge'] ?? null;
+      const freqUpper = ann['core:freq_upper_edge'] ?? ann['freq_upper_edge'] ?? null;
+      const reviewStatus = ann['rfview:review_status'] ?? ann['review_status'] ?? 'pending';
+
+      // 检查是否在可见窗口范围内
+      const annEnd = start + (count ?? 0);
+      const windowEnd = sampleOffset + windowSize;
+      const isVisible = (annEnd > sampleOffset && start < windowEnd);
+
+      if (!isVisible) continue;
+
+      visibleCount++;
+      const color = colorPalette[idx % colorPalette.length];
+
+      // 计算相对位置百分比
+      const relStart = Math.max(0, (start - sampleOffset) / windowSize * 100);
+      const relEnd = Math.min(100, (annEnd - sampleOffset) / windowSize * 100);
+      const width = Math.max(relEnd - relStart, 2);
+
+      // 频率信息
+      let freqInfo = '';
+      if (freqLower !== null && freqUpper !== null) {
+        freqInfo = ` | ${fmtFreq(freqLower)} - ${fmtFreq(freqUpper)}`;
+      }
+
+      html += `
+        <div class="annot-bar" data-sample-start="${start}" data-sample-count="${count ?? 0}">
+          <div class="annot-color" style="background:${color}"></div>
+          <span class="annot-label">${escHtml(label)}</span>
+          <span class="annot-range">#${fmtNum(start)} · ${fmtNum(count ?? 0)} 样本</span>
+          <span class="review-badge ${escHtml(reviewStatus)}">${escHtml(reviewStatus)}</span>
+          <span class="annot-freq">${escHtml(freqInfo)}</span>
+        </div>
+      `;
+    }
+
+    const predVisible = appendPredictionTimelineBars(sampleOffset, windowSize);
+    if (predVisible.html) {
+      visibleCount += predVisible.count;
+      html += predVisible.html;
+    }
+
+    if (visibleCount === 0) {
+      html += `
+        <div class="annot-placeholder">
+          📌 当前窗口内无可见标注 (共 ${annots.length} 条人工标注，不在当前采样范围内)
+        </div>
+      `;
+    }
+
+    annotTimeline.innerHTML = html;
+
+    // 点击 annotation 跳转
+    annotTimeline.querySelectorAll('.annot-bar').forEach((bar) => {
+      bar.addEventListener('click', () => {
+        const sampleStart = parseInt(bar.dataset.sampleStart, 10);
+        startSampleInput.value = String(sampleStart);
+        loadAndVisualize();
+      });
+    });
+
+    const predTotal = (predictionMeta && predictionMeta.annotations) ? predictionMeta.annotations.length : 0;
+    const totalText = predTotal > 0 ? `共 ${annots.length} 真值 / ${predTotal} 预测` : `共 ${annots.length} 条`;
+    setPlotStatus(annotStatus, `${visibleCount} 条可见 · ${totalText}`, visibleCount > 0);
+  }
+
+  /* ================================================================
+     IQ 时域图
+     ================================================================ */
+
+  function plotIQ(i, q, sampleOffset, fs) {
+    const N = i.length;
+    const t = new Float64Array(N);
+    for (let n = 0; n < N; n++) {
+      t[n] = (sampleOffset + n) / fs;
+    }
+
+    const traceI = {
+      x: Array.from(t),
+      y: Array.from(i),
+      type: 'scattergl',
+      mode: 'lines',
+      name: 'I (实部)',
+      line: { color: '#1e66f5', width: 1 },
+      hoverinfo: 'x+y+name',
+    };
+    const traceQ = {
+      x: Array.from(t),
+      y: Array.from(q),
+      type: 'scattergl',
+      mode: 'lines',
+      name: 'Q (虚部)',
+      line: { color: '#dc2626', width: 1 },
+      hoverinfo: 'x+y+name',
+    };
+
+    // capture 段竖线标记
+    const shapes = [];
+    if (captures && captures.length > 0) {
+      for (const cap of captures) {
+      const start = cap['core:sample_start'] ?? cap['sample_start'] ?? 0;
+        if (start >= sampleOffset && start <= sampleOffset + N) {
+          const tMark = start / fs;
+          shapes.push({
+            type: 'line',
+            x0: tMark, y0: -1, x1: tMark, y1: 1,
+            line: { color: '#059669', width: 1.5, dash: 'dot' },
+          });
+        }
+      }
+    }
+
+    const layout = plotlyLayout(
+      'IQ 时域波形',
+      '时间 (s)', '幅度',
+      {
+        shapes: shapes,
+        yaxis: {
+          title: { text: '幅度', font: { size: 11, color: '#6b7b8f' } },
+          gridcolor: '#eef1f8',
+          zerolinecolor: '#d0d9eb',
+          linecolor: '#c5d3eb',
+        },
+        dragmode: 'zoom',
+      }
+    );
+
+    Plotly.react(iqPlotDiv, [traceI, traceQ], layout, { responsive: true, displayModeBar: false });
+    setPlotStatus(iqStatus, `显示 ${fmtNum(N)} 样本`, true);
+  }
+
+  /* ================================================================
+     PSD 频谱图
+     ================================================================ */
+
+  function plotPSD(i, q, fs) {
+    const result = welchPSD(i, q, fs, FFT_SIZE, OVERLAP);
+    const xLabel = result.isComplex ? '频率 (Hz)' : '频率 (Hz)';
+    const trace = {
+      x: Array.from(result.freq),
+      y: Array.from(result.psd),
+      type: 'scattergl',
+      mode: 'lines',
+      name: 'PSD',
+      line: { color: '#1e66f5', width: 1.5 },
+      fill: 'tozeroy',
+      fillcolor: 'rgba(30,102,245,.10)',
+      hoverinfo: 'x+y',
+    };
+
+    const layout = plotlyLayout(
+      'PSD 功率谱密度',
+      xLabel, '功率谱密度 (dB/Hz)',
+      {
+        yaxis: {
+          title: { text: '功率谱密度 (dB/Hz)', font: { size: 11, color: '#6b7b8f' } },
+          gridcolor: '#eef1f8',
+          zerolinecolor: '#d0d9eb',
+          linecolor: '#c5d3eb',
+        },
+        dragmode: 'zoom',
+      }
+    );
+
+    // 复信号时固定 x 轴范围
+    if (result.isComplex) {
+      layout.xaxis.range = [-fs / 2, fs / 2];
+    }
+
+    Plotly.react(psdPlotDiv, [trace], layout, { responsive: true, displayModeBar: false });
+    setPlotStatus(psdStatus, `Welch N=${FFT_SIZE}${result.isComplex ? ' 复信号全频段' : ''}`, true);
+  }
+
+  /* ================================================================
+     瀑布图 (Spectrogram)
+     ================================================================ */
+
+  function plotSpectrogram(i, q, fs) {
+    const { time, freq, spec } = computeSpectrogram(i, q, fs, SPEC_NFFT, SPEC_HOP);
+
+    const nFreq = freq.length;
+    const nTime = time.length;
+    const z = [];
+    for (let k = 0; k < nFreq; k++) {
+      const row = new Float64Array(nTime);
+      for (let t = 0; t < nTime; t++) {
+        row[t] = spec[t][k];
+      }
+      z.push(Array.from(row));
+    }
+
+    const trace = {
+      x: Array.from(time),
+      y: Array.from(freq),
+      z: z,
+      type: 'heatmap',
+      colorscale: [
+        [0, '#0f172a'],
+        [0.2, '#1e3a5f'],
+        [0.4, '#1e66f5'],
+        [0.6, '#3b82f6'],
+        [0.8, '#f59e0b'],
+        [1, '#ef4444'],
+      ],
+      hovertemplate: '时间 %{x:.6f}s<br>频率 %{y:.2f} Hz<br>功率 %{z:.1f} dB<extra></extra>',
+    };
+
+    const layout = {
+      title: {
+        text: '瀑布图 (Spectrogram)',
+        font: { size: 13, color: '#1f2a37' },
+        x: 0.02,
+        xref: 'container',
+        y: 0.90,
+      },
+      margin: { l: 52, r: 14, t: 32, b: 40 },
+      paper_bgcolor: '#ffffff',
+      plot_bgcolor: '#fafcff',
+      font: { family: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif', size: 11, color: '#4b5a70' },
+      xaxis: {
+        title: { text: '时间 (s)', font: { size: 11, color: '#6b7b8f' } },
+        gridcolor: '#eef1f8',
+        zerolinecolor: '#d0d9eb',
+        linecolor: '#c5d3eb',
+      },
+      yaxis: {
+        title: { text: '频率 (Hz)', font: { size: 11, color: '#6b7b8f' } },
+        gridcolor: '#eef1f8',
+        zerolinecolor: '#d0d9eb',
+        linecolor: '#c5d3eb',
+      },
+      hovermode: 'closest',
+      dragmode: 'zoom',
+    };
+
+    Plotly.react(specPlotDiv, [trace], layout, { responsive: true, displayModeBar: false });
+    setPlotStatus(specStatus, `${nTime} 帧 × ${nFreq} 频点`, true);
+  }
+
+  /* ===================================================================
+     核心更新流程
+     =================================================================== */
+
+  async function loadAndVisualize() {
+    if (!currentData) {
+      setStatus('请先选择 SigMF 文件', 'warn');
+      return;
+    }
+
+    const startVal = parseInt(startSampleInput.value, 10) || 0;
+    const winVal   = parseInt(windowSizeInput.value, 10) || 4096;
+
+    const totalSamples = Math.floor(currentData.byteLength / SAMPLE_BYTES);
+    if (startVal >= totalSamples) {
+      setStatus(`起始样本 ${fmtNum(startVal)} 超出数据范围 (共 ${fmtNum(totalSamples)} 样本)`, 'err');
+      return;
+    }
+    const actualWindow = Math.min(winVal, totalSamples - startVal);
+    if (actualWindow < 256) {
+      setStatus(`窗口过小 (${actualWindow})，至少需要 256 样本`, 'warn');
+      return;
+    }
+
+    showProgress(true);
+    setStatus(`正在处理样本 ${fmtNum(startVal)} ~ ${fmtNum(startVal + actualWindow - 1)}…`, 'ok');
+
+    try {
+      const { i, q } = decodeCF32(currentData, startVal, actualWindow);
+      const fs = sampleRate || 81920000;
+
+      // 保存当前窗口数据（供联动用）
+      currentI = i;
+      currentQ = q;
+      currentFs = fs;
+      currentOffset = startVal;
+
+      await new Promise(r => setTimeout(r, 20));
+
+      // 绘制所有视图
+      plotIQ(i, q, startVal, fs);
+      plotConstellation(i, q);
+      plotPSD(i, q, fs);
+      plotSpectrogram(i, q, fs);
+
+      // 渲染标签时间轴
+      const annots = (currentMeta && currentMeta.annotations) || [];
+      renderAnnotationTimeline(annots, startVal, actualWindow, fs);
+
+      setStatus(`✅ 已加载 ${fmtNum(totalSamples)} 样本 · 显示 ${fmtNum(actualWindow)} 样本 · 起始 ${fmtNum(startVal)} · ${dataFileName}`, 'ok');
+    } catch (err) {
+      setStatus('❌ ' + err.message, 'err');
+      console.error(err);
+    } finally {
+      showProgress(false);
+    }
+  }
+
+  /* ===================================================================
+     主文件加载流程
+     =================================================================== */
+
+  async function handleFileSelect(file) {
+    if (!file) return;
+
+    showProgress(true);
+    setStatus('正在读取元数据…', 'ok');
+
+    try {
+      const meta = normalizeSigMFMeta(await loadMetaFile(file));
+      currentMeta = meta;
+
+      const global   = meta.global || {};
+      const datatype = global['core:datatype'] ?? global['datatype'] ?? '';
+      sampleRate     = toFiniteNumber(global['core:sample_rate'] ?? global['sample_rate'], 81920000);
+      captures       = meta.captures || [];
+      annotations    = meta.annotations || [];
+
+      if (datatype !== 'cf32_le') {
+        setStatus(`警告：当前仅支持 cf32_le，检测到 "${datatype}"，仍尝试加载`, 'warn');
+      }
+
+      const metaName  = file.name;
+      dataFileName    = metaName.replace(/\.sigmf-meta$/i, '') + '.sigmf-data';
+
+      fileNameLabel.textContent = file.name + ' → ' + dataFileName;
+      fileNameLabel.title = file.name;
+
+      renderMetaPanel(meta);
+
+      if (currentData) {
+        await loadAndVisualize();
+      } else {
+        setStatus(`请选择 data 文件 "${dataFileName}"`, 'warn');
+        showProgress(false);
+        alert(`已读取元数据文件 "${file.name}"。\n请在弹出的下一个对话框中选取对应的数据文件 "${dataFileName}"。`);
+        const dataFile = await pickDataFile(dataFileName);
+        if (dataFile) {
+          await handleDataFile(dataFile);
+        }
+      }
+    } catch (err) {
+      setStatus('❌ ' + err.message, 'err');
+      console.error(err);
+      showProgress(false);
+    }
+  }
+
+  function pickDataFile(suggestedName) {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.sigmf-data,.bin,.dat,.data,.iq';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+
+      input.addEventListener('change', () => {
+        document.body.removeChild(input);
+        resolve(input.files && input.files.length > 0 ? input.files[0] : null);
+      });
+
+      input.addEventListener('cancel', () => {
+        document.body.removeChild(input);
+        resolve(null);
+      });
+
+      input.click();
+    });
+  }
+
+  async function handleDataFile(file) {
+    if (!file) {
+      setStatus('未选择数据文件', 'warn');
+      return;
+    }
+
+    showProgress(true);
+    setStatus(`正在读取 ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)…`, 'ok');
+
+    try {
+      currentData = await loadDataFile(file);
+      sampleCount = Math.floor(currentData.byteLength / SAMPLE_BYTES);
+
+      if (currentData.byteLength % SAMPLE_BYTES !== 0) {
+        setStatus(`警告：数据大小 (${currentData.byteLength}) 不是 ${SAMPLE_BYTES} 的倍数`, 'warn');
+      }
+
+      fileNameLabel.textContent = dataFileName || file.name;
+      fileNameLabel.title = file.name;
+
+      if (currentMeta) {
+        renderEditableMetaPanel(currentMeta);
+      }
+
+      await loadAndVisualize();
+
+    } catch (err) {
+      setStatus('❌ ' + err.message, 'err');
+      console.error(err);
+      showProgress(false);
+    }
+  }
+
+  /* ===================================================================
+     拖拽分割线
+     =================================================================== */
+
+  function initResizer() {
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizer.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startWidth = document.querySelector('.sidebar').offsetWidth;
+      resizer.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const newWidth = Math.max(180, Math.min(500, startWidth + dx));
+      document.querySelector('.sidebar').style.width = newWidth + 'px';
+      // 更新所有 Plotly 图表尺寸
+      ALL_PLOT_DIVS.forEach(div => Plotly.Plots.resize(div));
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      resizer.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // 最终 resize
+      ALL_PLOT_DIVS.forEach(div => Plotly.Plots.resize(div));
+    });
+  }
+
+  /* ===================================================================
+     事件绑定
+     =================================================================== */
+
+  openFileBtn.addEventListener('click', () => { metaFileInput.click(); });
+
+  metaFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      await handleFileSelect(file);
+    }
+    metaFileInput.value = '';
+  });
+
+  updateBtn.addEventListener('click', loadAndVisualize);
+
+  startSampleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadAndVisualize();
+  });
+  windowSizeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadAndVisualize();
+  });
+
+  // 窗口大小变化时触发 Plotly 重排
+  window.addEventListener('resize', () => {
+    ALL_PLOT_DIVS.forEach(div => Plotly.Plots.resize(div));
+  });
+
+  /* ===================================================================
+     P3 标注与元数据 — 函数定义
+     =================================================================== */
+
+  // ---- 工具函数 ----
+
+  /** 深拷贝对象（JSON 安全） */
+  function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+  /** 标记修改状态 */
+  function markModified() {
+    if (hasMods) return; // 已标记，不重复追加
+    hasMods = true;
+    modifiedIndicator.style.display = 'inline-flex';
+    diffPreviewBtn.style.display = '';
+    revertBtn.style.display = '';
+    overlaySaveBtn.style.display = '';
+    saveMetaBtn.style.display = '';
+  }
+
+  /** 清除修改标记 */
+  function clearModified() {
+    hasMods = false;
+    modifiedIndicator.style.display = 'none';
+    diffPreviewBtn.style.display = 'none';
+    revertBtn.style.display = 'none';
+    overlaySaveBtn.style.display = 'none';
+    saveMetaBtn.style.display = 'none';
+  }
+
+  /** 读取当前表单值到 currentMeta */
+  function collectFormToMeta() {
+    if (!currentMeta) return;
+    normalizeSigMFMeta(currentMeta);
+    const g = currentMeta.global || {};
+    currentMeta.global = g;
+    // Global 字段
+    const dt = document.getElementById('edit_datatype');
+    if (dt) g['core:datatype'] = dt.value;
+    const sr = document.getElementById('edit_sample_rate');
+    if (sr) g['core:sample_rate'] = parseFloat(sr.value) || 0;
+    const desc = document.getElementById('edit_description');
+    if (desc) g['core:description'] = desc.value;
+    const author = document.getElementById('edit_author');
+    if (author) g['core:author'] = author.value;
+    const hw = document.getElementById('edit_hw');
+    if (hw) g['core:hw'] = hw.value;
+    const lic = document.getElementById('edit_license');
+    if (lic) g['core:license'] = lic.value;
+    // 自定义 KV
+    const kvContainer = document.getElementById('kvContainer');
+    if (kvContainer) {
+      // 清除旧的自定义字段（保留标准字段）
+      const standardKeys = ['core:datatype','core:sample_rate','core:description','core:author','core:hw','core:license','core:num_channels','core:version','core:sha512','core:recorder'];
+      Object.keys(g).forEach(k => {
+        if (!standardKeys.includes(k) && !k.startsWith('traceability:')) {
+          delete g[k];
+        }
+      });
+      kvContainer.querySelectorAll('.kv-row').forEach(row => {
+        const kInput = row.querySelector('.kv-key');
+        const vInput = row.querySelector('.kv-value');
+        if (kInput && vInput && kInput.value.trim()) {
+          g[kInput.value.trim()] = vInput.value;
+        }
+      });
+    }
+  }
+
+  /** 获取包含修改后的完整 meta 对象 */
+  function getModifiedMeta() {
+    if (!currentMeta) return null;
+    collectFormToMeta();
+    // 收集 captures 表单
+    const capTable = document.getElementById('captureTableBody');
+    if (capTable) {
+      const newCaps = [];
+      capTable.querySelectorAll('tr').forEach((tr) => {
+        const startInput = tr.querySelector('.cap-start');
+        const freqInput = tr.querySelector('.cap-freq');
+        const dtInput = tr.querySelector('.cap-dt');
+        if (startInput) {
+          newCaps.push({
+            'core:sample_start': parseInt(startInput.value) || 0,
+            'core:frequency': parseFloat(freqInput ? freqInput.value : 0) || 0,
+            'core:datetime': dtInput ? dtInput.value : ''
+          });
+        }
+      });
+      currentMeta.captures = newCaps;
+    }
+    return currentMeta;
+  }
+
+  /** 显示确认对话框 */
+  function showConfirm(title, message) {
+    return new Promise((resolve) => {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmModal.classList.add('show');
+      const cleanup = () => {
+        confirmModal.classList.remove('show');
+        confirmCancelBtn.removeEventListener('click', onCancel);
+        confirmOkBtn.removeEventListener('click', onOk);
+      };
+      const onCancel = () => { cleanup(); resolve(false); };
+      const onOk = () => { cleanup(); resolve(true); };
+      confirmCancelBtn.addEventListener('click', onCancel);
+      confirmOkBtn.addEventListener('click', onOk);
+    });
+  }
+
+  // ---- 可编辑元数据面板渲染 ----
+
+  /** 渲染可编辑的元数据面板（替代 renderMetaPanel） */
+  function renderEditableMetaPanel(meta) {
+    meta = normalizeSigMFMeta(meta);
+    if (!meta) {
+      metaContent.innerHTML = '<div class="meta-empty">请选择 .sigmf-meta 文件以查看元数据</div>';
+      metaBadge.textContent = '未加载';
+      return;
+    }
+
+    const global = meta.global || {};
+    const caps = meta.captures || [];
+    const annots = meta.annotations || [];
+
+    const datatype  = global['core:datatype'] ?? global['datatype'] ?? '';
+    const srate     = global['core:sample_rate'] ?? global['sample_rate'] ?? 0;
+    const hw        = global['core:hw'] ?? global['hw'] ?? '';
+    const author    = global['core:author'] ?? global['author'] ?? '';
+    const desc      = global['core:description'] ?? global['description'] ?? '';
+    const lic       = global['core:license'] ?? global['license'] ?? '';
+    const version   = global['core:version'] ?? global['version'] ?? '—';
+    const numChan   = global['core:num_channels'] ?? global['num_channels'] ?? 1;
+    const declaredLen = global['core:sample_count'] ?? global['traceability:sample_length'] ?? global['sample_count'] ?? '—';
+    const actualLen = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : '—';
+    const centerFreq = global['core:frequency'] ?? global['frequency'] ?? null;
+
+    let html = '';
+
+    // ---- Global 编辑表单 ----
+    html += '<div class="meta-section">';
+    html += '<h4>📌 全局信息 <span class="modified-badge" style="display:none" id="globalModBadge">✏️ 已修改</span></h4>';
+    html += '<table class="meta-table">';
+    html += `<tr><td>数据类型</td><td><select class="edit-select" id="edit_datatype" style="width:auto">`;
+    ['cf32_le','cf64_le','s16_le','s32_le','sc16_le','sc32_le','ru32_le','ru64_le'].forEach(dt => {
+      html += `<option value="${dt}"${dt === datatype ? ' selected' : ''}>${dt}</option>`;
+    });
+    html += `</select><div style="font-size:10px;color:var(--warn);display:none" id="dtWarn">⚠️ 变更数据类型会影响所有下游分析 <button type="button" class="inline-warn-toggle" data-hide="dtWarn" data-show="dtWarnToggle">✕</button></div><button type="button" class="inline-warn-toggle" style="font-size:9px;color:var(--muted);display:none" id="dtWarnToggle" data-hide="dtWarnToggle" data-show="dtWarn">⚠️ 再次显示警告</button></td></tr>`;
+    html += `<tr><td>采样率</td><td><input class="edit-input" id="edit_sample_rate" type="number" value="${escHtml(String(srate))}" step="1" style="width:120px" /><span style="font-size:10px;color:var(--muted);margin-left:4px">Hz</span><div style="font-size:10px;color:var(--warn);display:none" id="srWarn">⚠️ 变更采样率会影响频率轴和时域标尺 <button type="button" class="inline-warn-toggle" data-hide="srWarn" data-show="srWarnToggle">✕</button></div><button type="button" class="inline-warn-toggle" style="font-size:9px;color:var(--muted);display:none" id="srWarnToggle" data-hide="srWarnToggle" data-show="srWarn">⚠️ 再次显示警告</button></td></tr>`;
+    html += `<tr><td>中心频率</td><td>${fmtFreq(centerFreq)}</td></tr>`;
+    html += `<tr><td>通道数</td><td>${escHtml(String(numChan))}</td></tr>`;
+    html += `<tr><td>版本</td><td>${escHtml(version)}</td></tr>`;
+    html += `<tr><td>声明样本数</td><td>${declaredLen === '—' ? '—' : fmtNum(toFiniteNumber(declaredLen, declaredLen))}</td></tr>`;
+    html += `<tr><td>实际样本数</td><td>${fmtNum(typeof actualLen === 'number' ? actualLen : 0)}</td></tr>`;
+    html += `<tr><td>描述</td><td><input class="edit-input" id="edit_description" value="${escHtml(desc)}" placeholder="描述" /></td></tr>`;
+    html += `<tr><td>作者</td><td><input class="edit-input" id="edit_author" value="${escHtml(author)}" placeholder="作者" /></td></tr>`;
+    html += `<tr><td>硬件</td><td><input class="edit-input" id="edit_hw" value="${escHtml(hw)}" placeholder="硬件信息" /></td></tr>`;
+    html += `<tr><td>许可证</td><td><input class="edit-input" id="edit_license" value="${escHtml(lic)}" placeholder="许可证" /></td></tr>`;
+    html += '</table>';
+    // 自定义 KV
+    html += '<div style="margin-top:6px"><strong style="font-size:11px;color:var(--ink-light)">自定义字段</strong></div>';
+    html += '<div id="kvContainer">';
+    const standardKeys = ['core:datatype','core:sample_rate','core:description','core:author','core:hw','core:license','core:num_channels','core:version','core:sha512','core:recorder','core:frequency','core:sample_count'];
+    Object.keys(global).forEach(k => {
+      if (!standardKeys.includes(k) && !k.startsWith('traceability:') && typeof global[k] !== 'object') {
+        html += `<div class="kv-row">
+          <input class="edit-input kv-key" value="${escHtml(k)}" placeholder="key" />
+          <input class="edit-input kv-value" value="${escHtml(String(global[k]))}" placeholder="value" />
+          <button class="btn-icon danger kv-del-btn" title="删除此字段">✕</button>
+        </div>`;
+      }
+    });
+    html += '</div>';
+    html += `<button class="btn btn-sm btn-outline" id="addKvBtn" style="margin-top:4px;font-size:10px">+ 添加自定义字段</button>`;
+    html += '</div>';
+
+    // ---- Capture 段编辑表格 ----
+    html += '<div class="meta-section">';
+    html += `<h4>🎯 Capture 段 <span class="badge" style="background:var(--brand-light);color:var(--brand);padding:1px 8px;border-radius:999px;font-size:10px">${caps.length}</span></h4>`;
+    html += '<table class="capture-table"><thead><tr><th>sample_start</th><th>frequency</th><th>datetime</th><th></th></tr></thead><tbody id="captureTableBody">';
+    for (let i = 0; i < caps.length; i++) {
+      const c = caps[i];
+      const st = c['core:sample_start'] ?? c['sample_start'] ?? 0;
+      const fr = c['core:frequency'] ?? c['frequency'] ?? 0;
+      const dt = c['core:datetime'] ?? c['datetime'] ?? '';
+      html += `<tr data-cap-idx="${i}">
+        <td><input class="edit-input cap-start" value="${escHtml(String(st))}" type="number" min="0" step="1" /></td>
+        <td><input class="edit-input cap-freq" value="${escHtml(String(fr))}" type="number" min="0" step="1" /></td>
+        <td><input class="edit-input cap-dt" value="${escHtml(dt)}" style="width:160px" /></td>
+        <td><button class="btn-icon danger cap-del" title="删除此 capture 段">✕</button></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    html += '<div id="capValidation" style="font-size:10px;color:var(--danger);display:none"></div>';
+    html += `<button class="btn btn-sm btn-outline" id="addCapBtn" style="margin-top:4px;font-size:10px">+ 添加 Capture 段</button>`;
+    html += '</div>';
+
+    // ---- Annotation 面板 ----
+    html += '<div class="meta-section">';
+    html += `<h4>🏷️ Annotations <span class="badge" style="background:var(--brand-light);color:var(--brand);padding:1px 8px;border-radius:999px;font-size:10px">${annots.length}</span></h4>`;
+    html += `<div style="margin-bottom:4px"><button class="btn btn-sm btn-primary" id="newAnnotFromSelBtn" style="font-size:10px">+ 从当前选区新建标注</button></div>`;
+    if (annots.length === 0) {
+      html += '<div class="meta-empty">无标注 — 可点击上方按钮从当前采样窗口创建</div>';
+    } else {
+      html += '<table class="meta-table" id="annotListTable">';
+      const showCount = Math.min(annots.length, 50);
+      for (let i = 0; i < showCount; i++) {
+        const a = annots[i];
+        const st = a['core:sample_start'] ?? a['sample_start'] ?? 0;
+        const cnt = a['core:sample_count'] ?? a['sample_count'] ?? '—';
+        const lbl = a['core:label'] ?? a['label'] ?? `#${i+1}`;
+        const reviewStatus = a['rfview:review_status'] ?? a['review_status'] ?? 'pending';
+        html += `<tr data-annot-idx="${i}">
+          <td style="width:40px;font-weight:700;color:var(--brand);font-size:10px">#${i+1}</td>
+          <td style="max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(lbl)} <span class="review-badge ${escHtml(reviewStatus)}">${escHtml(reviewStatus)}</span></td>
+          <td style="font-size:10px;color:var(--muted)">#${fmtNum(st)} · ${fmtNum(cnt)}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn-icon annot-edit" title="编辑">✏️</button>
+            <button class="btn-icon danger annot-del" title="删除">✕</button>
+          </td>
+        </tr>`;
+      }
+      if (annots.length > 50) {
+        html += `<tr><td colspan="4" style="color:var(--muted);font-size:10px;text-align:center">…还有 ${annots.length - 50} 条（超出显示限制）</td></tr>`;
+      }
+      html += '</table>';
+    }
+    html += '</div>';
+
+    metaContent.innerHTML = html;
+    metaBadge.textContent = `${caps.length} cap · ${annots.length} ann`;
+
+    // 绑定事件监听器
+    bindMetaEditEvents();
+  }
+
+  /** HTML 转义 */
+  function escHtml(s) {
+    if (typeof s !== 'string') return String(s || '');
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /** 绑定元数据编辑相关事件 */
+  function bindMetaEditEvents() {
+    // 高风险字段警告（可再次显示）
+    const dtSelect = document.getElementById('edit_datatype');
+    const srInput = document.getElementById('edit_sample_rate');
+    if (dtSelect) {
+      dtSelect.addEventListener('change', () => {
+        const w = document.getElementById('dtWarn');
+        const t = document.getElementById('dtWarnToggle');
+        if (w) { w.style.display = ''; }
+        if (t) { t.style.display = 'none'; }
+        markModified();
+      });
+    }
+    if (srInput) {
+      srInput.addEventListener('input', () => {
+        const w = document.getElementById('srWarn');
+        const t = document.getElementById('srWarnToggle');
+        if (w) { w.style.display = ''; }
+        if (t) { t.style.display = 'none'; }
+        markModified();
+      });
+    }
+    // 警告显隐统一用事件绑定，避免内联 onclick 混入动态 HTML。
+    document.querySelectorAll('.inline-warn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const hideEl = document.getElementById(btn.dataset.hide);
+        const showEl = document.getElementById(btn.dataset.show);
+        if (hideEl) hideEl.style.display = 'none';
+        if (showEl) showEl.style.display = '';
+      });
+    });
+
+    // 其他输入框
+    ['edit_description','edit_author','edit_hw','edit_license'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', markModified);
+    });
+
+    // 添加自定义 KV
+    const addKvBtn = document.getElementById('addKvBtn');
+    if (addKvBtn) {
+      addKvBtn.addEventListener('click', () => {
+        const container = document.getElementById('kvContainer');
+        const row = document.createElement('div');
+        row.className = 'kv-row';
+        row.innerHTML = `<input class="edit-input kv-key" placeholder="key（如 core:myfield）" />
+          <input class="edit-input kv-value" placeholder="value" />
+          <button class="btn-icon danger kv-del-btn" title="删除此字段">✕</button>`;
+        container.appendChild(row);
+        row.querySelector('.kv-key').focus();
+        markModified();
+      });
+    }
+
+    // 事件委托：KV 删除按钮
+    const kvContainer = document.getElementById('kvContainer');
+    if (kvContainer) {
+      kvContainer.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.kv-del-btn');
+        if (delBtn) {
+          delBtn.parentElement.remove();
+          markModified();
+        }
+      });
+    }
+
+    // Capture 段编辑
+    document.querySelectorAll('.cap-start, .cap-freq, .cap-dt').forEach(el => {
+      el.addEventListener('input', () => { markModified(); validateCaptureMonotonic(); });
+    });
+
+    // 删除 capture
+    document.querySelectorAll('.cap-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const idx = parseInt(tr.dataset.capIdx, 10);
+        const confirmed = await showConfirm('删除 Capture 段', `确定删除第 ${idx+1} 条 capture 段？`);
+        if (confirmed) {
+          currentMeta.captures.splice(idx, 1);
+          markModified();
+          renderEditableMetaPanel(currentMeta);
+        }
+      });
+    });
+
+    // 添加 capture
+    const addCapBtn = document.getElementById('addCapBtn');
+    if (addCapBtn) {
+      addCapBtn.addEventListener('click', () => {
+        if (!currentMeta) return;
+        const caps = currentMeta.captures || [];
+        const lastStart = caps.length > 0 ? (caps[caps.length-1]['core:sample_start'] ?? 0) : 0;
+        caps.push({
+          'core:sample_start': lastStart + 1000,
+          'core:frequency': 1000000000,
+          'core:datetime': new Date().toISOString()
+        });
+        markModified();
+        renderEditableMetaPanel(currentMeta);
+      });
+    }
+
+    // Annotation 编辑
+    document.querySelectorAll('.annot-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tr = btn.closest('tr');
+        const idx = parseInt(tr.dataset.annotIdx, 10);
+        openAnnotationEditor(idx);
+      });
+    });
+
+    // Annotation 删除
+    document.querySelectorAll('.annot-del').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const tr = btn.closest('tr');
+        const idx = parseInt(tr.dataset.annotIdx, 10);
+        const ann = currentMeta.annotations[idx];
+        const label = ann && (ann['core:label'] ?? ann['label'] ?? `#${idx+1}`);
+        const confirmed = await showConfirm('删除 Annotation', `确定删除标注 "${label}"？`);
+        if (confirmed) {
+          currentMeta.annotations.splice(idx, 1);
+          markModified();
+          renderEditableMetaPanel(currentMeta);
+          // 刷新标签时间轴
+          if (currentI) loadAndVisualize();
+        }
+      });
+    });
+
+    // 从当前选区新建标注
+    const newAnnotBtn = document.getElementById('newAnnotFromSelBtn');
+    if (newAnnotBtn) {
+      newAnnotBtn.addEventListener('click', createAnnotationFromSelection);
+    }
+  }
+
+  // ---- Capture 单调性校验 ----
+  function validateCaptureMonotonic() {
+    const capTable = document.getElementById('captureTableBody');
+    if (!capTable) return;
+    const errDiv = document.getElementById('capValidation');
+    let errors = [];
+    const starts = [];
+    capTable.querySelectorAll('tr').forEach((tr, i) => {
+      const inp = tr.querySelector('.cap-start');
+      if (inp) {
+        const v = parseInt(inp.value) || 0;
+        if (i > 0 && v <= starts[i-1]) {
+          errors.push(`第 ${i+1} 行 sample_start (${v}) 必须大于前一行的 ${starts[i-1]}`);
+          inp.classList.add('danger');
+        } else {
+          inp.classList.remove('danger');
+        }
+        starts.push(v);
+      }
+    });
+    if (errors.length > 0) {
+      errDiv.textContent = errors.join('; ');
+      errDiv.style.display = '';
+    } else {
+      errDiv.style.display = 'none';
+    }
+  }
+
+  // ---- Annotation 编辑器浮窗 ----
+  function openAnnotationEditor(idx) {
+    closeAnnotationEditor();
+    const annots = currentMeta.annotations || [];
+    if (idx < 0 || idx >= annots.length) return;
+    editingAnnotIdx = idx;
+    const a = annots[idx];
+    const start = a['core:sample_start'] ?? a['sample_start'] ?? 0;
+    const count = a['core:sample_count'] ?? a['sample_count'] ?? 0;
+    const label = a['core:label'] ?? a['label'] ?? '';
+    const fLow = a['core:freq_lower_edge'] ?? a['freq_lower_edge'] ?? '';
+    const fUp = a['core:freq_upper_edge'] ?? a['freq_upper_edge'] ?? '';
+    const comment = a['core:comment'] ?? a['comment'] ?? '';
+    const reviewStatus = a['rfview:review_status'] ?? a['review_status'] ?? 'pending';
+    const reviewer = a['rfview:reviewer'] ?? a['reviewer'] ?? '';
+    const reviewNote = a['rfview:review_note'] ?? a['review_note'] ?? '';
+    const totalSamples = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : Number.MAX_SAFE_INTEGER;
+
+    const div = document.createElement('div');
+    div.className = 'annot-editor';
+    div.id = 'annotEditorPopup';
+    div.innerHTML = `
+      <h4><span>✏️ 编辑标注 #${idx+1}</span>
+        <button class="btn-icon" id="ae_closeBtn" style="font-size:14px">✕</button>
+      </h4>
+      <div class="form-row"><label>标签</label><input class="edit-input" id="ae_label" value="${escHtml(label)}" /></div>
+      <div class="form-row"><label>起始样本</label><input class="edit-input small" id="ae_start" type="number" min="0" max="${totalSamples-1}" value="${escHtml(String(start))}" /></div>
+      <div class="form-row"><label>样本数</label><input class="edit-input small" id="ae_count" type="number" min="1" max="${totalSamples}" value="${escHtml(String(count))}" /></div>
+      <div class="form-row"><label>下限频率</label><input class="edit-input small" id="ae_freqLow" type="number" min="0" value="${escHtml(String(fLow))}" placeholder="Hz" /></div>
+      <div class="form-row"><label>上限频率</label><input class="edit-input small" id="ae_freqUp" type="number" min="0" value="${escHtml(String(fUp))}" placeholder="Hz" /></div>
+      <div class="form-row" style="align-items:flex-start"><label>备注</label><textarea class="edit-input" id="ae_comment" rows="2" style="resize:vertical;min-height:30px;font-family:inherit">${escHtml(comment)}</textarea></div>
+      <div class="form-row"><label>复核状态</label><select class="edit-select" id="ae_reviewStatus"><option value="pending"${reviewStatus === 'pending' ? ' selected' : ''}>pending</option><option value="approved"${reviewStatus === 'approved' ? ' selected' : ''}>approved</option><option value="rejected"${reviewStatus === 'rejected' ? ' selected' : ''}>rejected</option></select></div>
+      <div class="form-row"><label>复核人</label><input class="edit-input" id="ae_reviewer" value="${escHtml(reviewer)}" placeholder="reviewer" /></div>
+      <div class="form-row" style="align-items:flex-start"><label>复核备注</label><textarea class="edit-input" id="ae_reviewNote" rows="2" style="resize:vertical;min-height:30px;font-family:inherit">${escHtml(reviewNote)}</textarea></div>
+      <div id="ae_validation" class="validation-msg"></div>
+      <div class="form-actions">
+        <button class="btn btn-outline" id="ae_saveBtn">💾 保存</button>
+        <button class="btn btn-danger-light" id="ae_deleteBtn">🗑️ 删除</button>
+        <button class="btn btn-outline" id="ae_cancelBtn">取消</button>
+      </div>
+    `;
+
+    // 定位到 annotation 行旁边
+    const targetRow = document.querySelector(`#annotListTable tr[data-annot-idx="${idx}"]`);
+    if (targetRow) {
+      const rect = targetRow.getBoundingClientRect();
+      div.style.position = 'fixed';
+      div.style.left = Math.min(rect.right + 10, window.innerWidth - 330) + 'px';
+      div.style.top = Math.max(10, rect.top - 10) + 'px';
+    } else {
+      div.style.position = 'fixed';
+      div.style.left = '50%';
+      div.style.top = '30%';
+      div.style.transform = 'translateX(-50%)';
+    }
+
+    document.body.appendChild(div);
+    annotEditorDiv = div;
+
+    // 按钮事件
+    document.getElementById('ae_closeBtn').addEventListener('click', closeAnnotationEditor);
+    document.getElementById('ae_saveBtn').addEventListener('click', () => saveAnnotationEdit(idx));
+    document.getElementById('ae_deleteBtn').addEventListener('click', async () => {
+      const confirmed = await showConfirm('删除 Annotation', `确定删除标注 #${idx+1}？`);
+      if (confirmed) {
+        currentMeta.annotations.splice(idx, 1);
+        markModified();
+        closeAnnotationEditor();
+        renderEditableMetaPanel(currentMeta);
+        if (currentI) loadAndVisualize();
+      }
+    });
+    document.getElementById('ae_cancelBtn').addEventListener('click', closeAnnotationEditor);
+
+    // 输入验证
+    ['ae_start','ae_count','ae_freqLow','ae_freqUp'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => validateAnnotationForm());
+    });
+  }
+
+  function closeAnnotationEditor() {
+    if (annotEditorDiv) {
+      annotEditorDiv.remove();
+      annotEditorDiv = null;
+    }
+    editingAnnotIdx = -1;
+  }
+
+  /** 验证 annotation 表单 */
+  function validateAnnotationForm() {
+    const totalSamples = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : Infinity;
+    const start = parseInt(document.getElementById('ae_start').value) || 0;
+    const count = parseInt(document.getElementById('ae_count').value) || 0;
+    const fLowRaw = document.getElementById('ae_freqLow').value.trim();
+    const fUpRaw = document.getElementById('ae_freqUp').value.trim();
+    const fLow = fLowRaw === '' ? null : toFiniteNumber(fLowRaw, NaN);
+    const fUp = fUpRaw === '' ? null : toFiniteNumber(fUpRaw, NaN);
+    const msgEl = document.getElementById('ae_validation');
+    const errors = [];
+    if (start < 0) errors.push('起始样本不能为负');
+    if (count < 1) errors.push('样本数必须 ≥ 1');
+    if (start + count > totalSamples) errors.push(`超出数据边界（共 ${totalSamples} 样本）`);
+    if (Number.isNaN(fLow)) errors.push('下限频率必须是数字');
+    if (Number.isNaN(fUp)) errors.push('上限频率必须是数字');
+    if (fLow !== null && fUp !== null && !Number.isNaN(fLow) && !Number.isNaN(fUp) && fLow > fUp) errors.push('下限频率不能大于上限频率');
+    msgEl.textContent = errors.join('；');
+    return errors.length === 0;
+  }
+
+  /** 保存 annotation 编辑 */
+  function saveAnnotationEdit(idx) {
+    if (!validateAnnotationForm()) return;
+    const annots = currentMeta.annotations;
+    if (idx < 0 || idx >= annots.length) return;
+    const a = annots[idx];
+    const label = document.getElementById('ae_label').value.trim() || `标注 #${idx+1}`;
+    const start = parseInt(document.getElementById('ae_start').value) || 0;
+    const count = parseInt(document.getElementById('ae_count').value) || 1;
+    const fLowRaw = document.getElementById('ae_freqLow').value.trim();
+    const fUpRaw = document.getElementById('ae_freqUp').value.trim();
+    const fLow = fLowRaw === '' ? undefined : toFiniteNumber(fLowRaw, undefined);
+    const fUp = fUpRaw === '' ? undefined : toFiniteNumber(fUpRaw, undefined);
+    const comment = document.getElementById('ae_comment').value.trim() || undefined;
+    const reviewStatus = document.getElementById('ae_reviewStatus').value || 'pending';
+    const reviewer = document.getElementById('ae_reviewer').value.trim() || undefined;
+    const reviewNote = document.getElementById('ae_reviewNote').value.trim() || undefined;
+    const prevReviewStatus = a['rfview:review_status'] || 'pending';
+
+    // 更新 annotation 字段（保持 SigMF 命名风格）
+    a['core:sample_start'] = start;
+    a['core:sample_count'] = count;
+    a['core:label'] = label;
+    if (fLow !== undefined) a['core:freq_lower_edge'] = fLow; else delete a['core:freq_lower_edge'];
+    if (fUp !== undefined) a['core:freq_upper_edge'] = fUp; else delete a['core:freq_upper_edge'];
+    if (comment) a['core:comment'] = comment; else delete a['core:comment'];
+    a['rfview:review_status'] = reviewStatus;
+    // 复审状态发生变化时记录编辑确认时间。
+    if (reviewStatus !== prevReviewStatus) a['rfview:reviewed_at'] = new Date().toISOString();
+    if (reviewer) a['rfview:reviewer'] = reviewer; else delete a['rfview:reviewer'];
+    if (reviewNote) a['rfview:review_note'] = reviewNote; else delete a['rfview:review_note'];
+
+    markModified();
+    closeAnnotationEditor();
+    renderEditableMetaPanel(currentMeta);
+    // 刷新时间轴
+    if (currentI) loadAndVisualize();
+  }
+
+  /** 从当前选择范围创建新标注 */
+  function createAnnotationFromSelection() {
+    if (!currentMeta) { setStatus('请先加载 SigMF 文件', 'warn'); return; }
+    const start = parseInt(startSampleInput.value) || 0;
+    const winSize = parseInt(windowSizeInput.value) || 4096;
+    const totalSamples = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : Infinity;
+
+    const annots = currentMeta.annotations || [];
+    annots.push({
+      'core:sample_start': start,
+      'core:sample_count': Math.min(winSize, totalSamples - start),
+      'core:label': `标注 #${annots.length + 1}`,
+      'rfview:review_status': 'pending'
+    });
+    markModified();
+    renderEditableMetaPanel(currentMeta);
+    // 打开编辑器
+    openAnnotationEditor(annots.length - 1);
+    setStatus(`✅ 已创建新标注 #${annots.length}，请编辑内容`, 'ok');
+  }
+
+  // ---- Diff 预览 ----
+  function computeDiff() {
+    const orig = originalMeta;
+    const modified = getModifiedMeta();
+    if (!orig || !modified) return '无数据可比较';
+
+    const origStr = JSON.stringify(orig, null, 2);
+    const modStr = JSON.stringify(modified, null, 2);
+    const origLines = origStr.split('\n');
+    const modLines = modStr.split('\n');
+
+    // 简单的逐行 diff
+    let result = '<div class="diff-header">原始 vs 修改后</div>';
+    const maxLen = Math.max(origLines.length, modLines.length);
+    for (let i = 0; i < maxLen; i++) {
+      const oLine = origLines[i] || '';
+      const mLine = modLines[i] || '';
+      if (oLine === mLine) {
+        result += `<div class="diff-line unchanged">${escHtml(oLine)}</div>`;
+      } else {
+        if (oLine) result += `<div class="diff-line removed">- ${escHtml(oLine)}</div>`;
+        if (mLine) result += `<div class="diff-line added">+ ${escHtml(mLine)}</div>`;
+      }
+    }
+    return result;
+  }
+
+  function showDiffPreview() {
+    const content = computeDiff();
+    diffContent.innerHTML = content;
+    diffModal.classList.add('show');
+  }
+
+  // ---- 保存功能 ----
+  function downloadJSON(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /** 保存为 overlay JSON（不覆盖原文件） */
+  function saveAsOverlay() {
+    const meta = getModifiedMeta();
+    if (!meta) { setStatus('无数据可保存', 'err'); return; }
+    // 构建 overlay：只包含 annotations 和修改的 global/captures
+    const overlay = {
+      'global': meta.global || {},
+      'captures': meta.captures || [],
+      'annotations': meta.annotations || []
+    };
+    const baseName = metaFileName.replace(/\.sigmf-meta$/i, '') || 'export';
+    downloadJSON(overlay, `${baseName}.overlay.json`);
+    setStatus(`✅ 已导出 overlay: ${baseName}.overlay.json`, 'ok');
+  }
+
+  /** 保存完整 .sigmf-meta 文件 */
+  function saveFullMeta() {
+    const meta = getModifiedMeta();
+    if (!meta) { setStatus('无数据可保存', 'err'); return; }
+    const baseName = metaFileName.replace(/\.sigmf-meta$/i, '') || 'export';
+    downloadJSON(meta, `${baseName}.sigmf-meta`);
+    // 保存后同步 originalMeta，确保后续 diff/撤销正常
+    originalMeta = deepClone(meta);
+    // 保存后清除修改标记（下载了最新版本）
+    clearModified();
+    setStatus(`✅ 已下载: ${baseName}.sigmf-meta`, 'ok');
+  }
+
+  /** 撤销所有修改，恢复原始值 */
+  function revertAllChanges() {
+    if (!originalMeta) return;
+    currentMeta = deepClone(originalMeta);
+    // 更新全局变量
+    const global = currentMeta.global || {};
+    captures = currentMeta.captures || [];
+    annotations = currentMeta.annotations || [];
+    sampleRate = toFiniteNumber(global['core:sample_rate'] ?? global['sample_rate'], 81920000);
+    clearModified();
+    renderEditableMetaPanel(currentMeta);
+    if (currentI) loadAndVisualize();
+    setStatus('✅ 已撤销所有修改，恢复原始值', 'ok');
+  }
+
+  // ---- 修改 handleFileSelect 以支持 P3 ----
+  // 保存原始引用以便调用
+  const _origHandleFileSelect = handleFileSelect;
+  handleFileSelect = async function(file) {
+    if (!file) return;
+
+    showProgress(true);
+    setStatus('正在读取元数据…', 'ok');
+
+    try {
+      const meta = normalizeSigMFMeta(await loadMetaFile(file));
+      currentMeta = meta;
+      originalMeta = deepClone(meta);
+      metaFileName = file.name;
+      hasMods = false;
+
+      const global   = meta.global || {};
+      const datatype = global['core:datatype'] ?? global['datatype'] ?? '';
+      sampleRate     = toFiniteNumber(global['core:sample_rate'] ?? global['sample_rate'], 81920000);
+      captures       = meta.captures || [];
+      annotations    = meta.annotations || [];
+
+      if (datatype !== 'cf32_le') {
+        setStatus(`警告：当前仅支持 cf32_le，检测到 "${datatype}"，仍尝试加载`, 'warn');
+      }
+
+      const metaName  = file.name;
+      dataFileName    = metaName.replace(/\.sigmf-meta$/i, '') + '.sigmf-data';
+
+      fileNameLabel.textContent = file.name + ' → ' + dataFileName;
+      fileNameLabel.title = file.name;
+
+      clearModified();
+      renderEditableMetaPanel(meta);
+
+      if (currentData) {
+        await loadAndVisualize();
+      } else {
+        setStatus(`请选择 data 文件 "${dataFileName}"`, 'warn');
+        showProgress(false);
+        alert(`已读取元数据文件 "${file.name}"。\n请在弹出的下一个对话框中选取对应的数据文件 "${dataFileName}"。`);
+        const dataFile = await pickDataFile(dataFileName);
+        if (dataFile) {
+          await handleDataFile(dataFile);
+        }
+      }
+    } catch (err) {
+      setStatus('❌ ' + err.message, 'err');
+      console.error(err);
+      showProgress(false);
+    }
+  };
+
+  // ---- 初始化 P3 事件绑定 ----
+  diffCloseBtn.addEventListener('click', () => diffModal.classList.remove('show'));
+  diffModal.addEventListener('click', (e) => { if (e.target === diffModal) diffModal.classList.remove('show'); });
+  diffPreviewBtn.addEventListener('click', showDiffPreview);
+  revertBtn.addEventListener('click', async () => {
+    const confirmed = await showConfirm('撤销修改', '确定撤销所有未保存的修改？');
+    if (confirmed) revertAllChanges();
+  });
+  overlaySaveBtn.addEventListener('click', saveAsOverlay);
+  saveMetaBtn.addEventListener('click', saveFullMeta);
+
+  /* ===================================================================
+     P4 RFML 就绪 — Taxonomy · Split · 切片 · 导出 · 门禁
+     =================================================================== */
+
+  // ---- P4 DOM 引用 ----
+  const rfmlPanel         = document.getElementById('rfmlPanel');
+  const rfmlHeader        = document.getElementById('rfmlHeader');
+  const rfmlBody          = document.getElementById('rfmlBody');
+  const taxonomyContent   = document.getElementById('taxonomyContent');
+  const taxonomyCount     = document.getElementById('taxonomyCount');
+  const splitContent      = document.getElementById('splitContent');
+  const sliceContent      = document.getElementById('sliceContent');
+  const manifestContent   = document.getElementById('manifestContent');
+  const gateContent       = document.getElementById('gateContent');
+
+  // ---- P5 DOM 引用 ----
+  const p5Panel               = document.getElementById('p5Panel');
+  const p5Header              = document.getElementById('p5Header');
+  const remoteMetaUrlInput    = document.getElementById('remoteMetaUrl');
+  const remoteDataUrlInput    = document.getElementById('remoteDataUrl');
+  const loadRemoteBtn         = document.getElementById('loadRemoteBtn');
+  const deriveDataUrlBtn      = document.getElementById('deriveDataUrlBtn');
+  const remoteStatus          = document.getElementById('remoteStatus');
+  const reviewerInput         = document.getElementById('reviewerInput');
+  const bulkReviewStatus      = document.getElementById('bulkReviewStatus');
+  const bulkReviewNote        = document.getElementById('bulkReviewNote');
+  const applyBulkReviewBtn    = document.getElementById('applyBulkReviewBtn');
+  const applyVisibleReviewBtn = document.getElementById('applyVisibleReviewBtn');
+  const reviewBadge           = document.getElementById('reviewBadge');
+  const reviewContent         = document.getElementById('reviewContent');
+  const batchAssetCount       = document.getElementById('batchAssetCount');
+  const batchManifestCount    = document.getElementById('batchManifestCount');
+  const addBatchAssetBtn      = document.getElementById('addBatchAssetBtn');
+  const clearBatchBtn         = document.getElementById('clearBatchBtn');
+  const exportBatchManifestBtn= document.getElementById('exportBatchManifestBtn');
+  const exportBatchReportBtn  = document.getElementById('exportBatchReportBtn');
+  const batchContent          = document.getElementById('batchContent');
+  const predictionFileInput   = document.getElementById('predictionFileInput');
+  const loadPredictionBtn     = document.getElementById('loadPredictionBtn');
+  const clearPredictionBtn    = document.getElementById('clearPredictionBtn');
+  const exportCompareBtn      = document.getElementById('exportCompareBtn');
+  const predictionContent     = document.getElementById('predictionContent');
+  const statsContent          = document.getElementById('statsContent');
+
+  // ---- P4 状态 ----
+  let p4Taxonomy   = [];         // [{id, name, count, pct, color}]
+  let p4Splits     = {};         // {train: [...idx], val: [...idx], test: [...idx]}
+  let p4SplitRatios= { train: 70, val: 15, test: 15 };
+  let p4SliceWin   = 1024;       // 窗口长度
+  let p4SliceStep  = 512;        // 步长
+  let p4Slices     = [];         // [{start, end, label_id, label_name}]
+  let p4GateResults= {};         // {labelCoverage, classBalance, dataConsistency, noLeakage}
+  let p4GatePassed = false;      // 门禁是否通过
+  let p4LabelsMap  = {};         // label -> unique id mapping for assignment
+
+  // ---- P5 状态 ----
+  let predictionMeta = null;      // 模型预测标注 meta（第二份 SigMF meta）
+  let predictionName = '';        // 预测 meta 文件名或 URL
+  let batchAssets = [];           // 当前浏览器会话中的批处理资产快照
+
+  // RadioML2018 标准调制类别
+  const RADIOML2018_CLASSES = [
+    '8PSK', 'AM-DSB', 'AM-SSB', 'BPSK', 'CPFSK',
+    'GFSK', 'PAM4', 'QAM16', 'QAM64', 'QPSK', 'WBFM'
+  ];
+
+  /** 类别颜色调色板 */
+  const TAXONOMY_COLORS = [
+    '#1e66f5','#059669','#d97706','#dc2626','#7c3aed',
+    '#0d9488','#0284c7','#9333ea','#ea580c','#0891b2',
+    '#65a30d','#ca8a04','#be185d','#4f46e5','#0f766e'
+  ];
+
+  // ---- Split 可复现种子 ----
+  let p4Seed = null;             // 当前种子值（null 表示未设置，使用 Date.now 哈希）
+  let p4SeededRandom = null;     // seeded random function
+
+  /** mulberry32 种子 PRNG（返回 [0,1) 的伪随机数） */
+  function mulberry32(seed) {
+    let s = seed | 0;
+    return function() {
+      s = s + 0x6D2B79F5 | 0;
+      let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /** 获取或初始化种子 PRNG */
+  function getSeededRandom() {
+    if (!p4SeededRandom) {
+      const seed = p4Seed !== null ? p4Seed : ((Date.now() & 0xFFFFFFFF) >>> 0);
+      p4Seed = seed; // 记录实际使用的种子
+      p4SeededRandom = mulberry32(seed);
+    }
+    return p4SeededRandom;
+  }
+
+  /** 重置种子 PRNG（强制使用新种子重新分配） */
+  function resetSeededRandom(newSeed) {
+    p4Seed = newSeed !== undefined ? newSeed : null;
+    p4SeededRandom = null;
+  }
+
+  // ---- 用于识别 annotation 中的 label 字段（支持多种 sigmf 格式）----
+  function getAnnotLabel(ann) {
+    return ann['core:label'] ?? ann['label'] ?? '';
+  }
+  function getAnnotStart(ann) {
+    return ann['core:sample_start'] ?? ann['sample_start'] ?? 0;
+  }
+  function getAnnotCount(ann) {
+    return ann['core:sample_count'] ?? ann['sample_count'] ?? 0;
+  }
+  function getAnnotFreqLow(ann) {
+    return ann['core:freq_lower_edge'] ?? ann['freq_lower_edge'] ?? null;
+  }
+  function getAnnotFreqUp(ann) {
+    return ann['core:freq_upper_edge'] ?? ann['freq_upper_edge'] ?? null;
+  }
+
+  // ================================================================
+  //  1. Taxonomy 管理
+  // ================================================================
+
+  /** 从 annotations 构建 taxonomy */
+  function buildTaxonomy() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    const labelCounts = {};
+    let totalLabeled = 0;
+
+    // 统计每个 label 的样本数（按 annotation 的 sample_count 累加）
+    for (const ann of annots) {
+      const label = getAnnotLabel(ann);
+      const count = getAnnotCount(ann);
+      if (label && count > 0) {
+        labelCounts[label] = (labelCounts[label] || 0) + count;
+        totalLabeled += count;
+      }
+    }
+
+    // 构建 taxonomy 列表，按样本数降序排列
+    const entries = Object.entries(labelCounts)
+      .sort((a, b) => b[1] - a[1]);
+
+    const total = totalLabeled || 1; // 避免除以0
+
+    p4Taxonomy = entries.map(([name, count], idx) => {
+      // 如果 name 是 RadioML 标准格式，使用 mod.xxx 作为 id（精确匹配，避免 "BPSK_v2" 误匹配 "BPSK"）
+      const stdClass = RADIOML2018_CLASSES.find(c =>
+        c.toLowerCase() === name.toLowerCase()
+      );
+      const id = stdClass ? 'mod.' + stdClass.toLowerCase() : 'custom.' + name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      return {
+        id: id,
+        name: name,
+        count: count,
+        pct: (count / total * 100),
+        color: TAXONOMY_COLORS[idx % TAXONOMY_COLORS.length]
+      };
+    });
+
+    // 如果没有标注，但数据已加载，显示提示
+    if (p4Taxonomy.length === 0 && currentMeta && currentData) {
+      // 添加 RadioML2018 标准类别作为预设
+      p4Taxonomy = RADIOML2018_CLASSES.map((name, idx) => ({
+        id: 'mod.' + name.toLowerCase(),
+        name: name,
+        count: 0,
+        pct: 0,
+        color: TAXONOMY_COLORS[idx % TAXONOMY_COLORS.length]
+      }));
+    }
+
+    renderTaxonomy();
+  }
+
+  /** 渲染 Taxonomy 表格 */
+  function renderTaxonomy() {
+    if (!p4Taxonomy || p4Taxonomy.length === 0) {
+      taxonomyContent.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">无标注数据 — 加载 SigMF 文件后自动构建</div>';
+      taxonomyCount.textContent = '0';
+      return;
+    }
+
+    taxonomyCount.textContent = String(p4Taxonomy.length);
+
+    let html = '<table class="taxonomy-table">';
+    html += '<thead><tr><th>类别 ID</th><th>名称</th><th>样本</th><th>占比</th></tr></thead><tbody>';
+
+    for (const item of p4Taxonomy) {
+      const barWidth = Math.max(2, item.pct);
+      html += `<tr>
+        <td><input class="edit-input" value="${escHtml(item.id)}" data-tax-idx="${p4Taxonomy.indexOf(item)}" data-tax-field="id" style="font-size:9px" /></td>
+        <td><input class="edit-input" value="${escHtml(item.name)}" data-tax-idx="${p4Taxonomy.indexOf(item)}" data-tax-field="name" style="font-size:9px" /></td>
+        <td style="text-align:right;font-size:10px">${fmtNum(item.count)}</td>
+        <td style="min-width:60px">
+          <div class="taxonomy-bar"><div class="fill" style="width:${barWidth}%;background:${item.color}"></div></div>
+          <span style="font-size:9px;color:var(--muted)">${item.pct.toFixed(1)}%</span>
+        </td>
+      </tr>`;
+    }
+
+    html += '</tbody></table>';
+
+    // 添加自定义类别按钮
+    html += '<div style="margin-top:4px;display:flex;gap:4px">';
+    html += '<button class="rfml-btn rfml-btn-sm" id="addTaxonomyBtn">+ 添加自定义类别</button>';
+    html += '<button class="rfml-btn rfml-btn-sm rfml-btn-outline" id="resetTaxonomyBtn">↺ 重置</button>';
+    html += '</div>';
+
+    taxonomyContent.innerHTML = html;
+
+    // 绑定 taxonomy 编辑事件
+    taxonomyContent.querySelectorAll('.edit-input[data-tax-field]').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.taxIdx, 10);
+        const field = e.target.dataset.taxField;
+        if (idx >= 0 && idx < p4Taxonomy.length) {
+          p4Taxonomy[idx][field] = e.target.value;
+        }
+      });
+    });
+
+    document.getElementById('addTaxonomyBtn')?.addEventListener('click', () => {
+      const newName = '自定义_' + (p4Taxonomy.length + 1);
+      p4Taxonomy.push({
+        id: 'custom.' + newName.toLowerCase(),
+        name: newName,
+        count: 0,
+        pct: 0,
+        color: TAXONOMY_COLORS[p4Taxonomy.length % TAXONOMY_COLORS.length]
+      });
+      renderTaxonomy();
+    });
+
+    document.getElementById('resetTaxonomyBtn')?.addEventListener('click', () => {
+      buildTaxonomy();
+    });
+  }
+
+  // ================================================================
+  //  2. Split 分配
+  // ================================================================
+
+  /** 计算 annotation 的 split 分配 */
+  function computeSplits() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    if (annots.length === 0) {
+      p4Splits = { train: [], val: [], test: [] };
+      renderSplits();
+      return;
+    }
+
+    const total = annots.length;
+    const rTrain = p4SplitRatios.train / 100;
+    const rVal   = p4SplitRatios.val / 100;
+
+    // 按 label 分层随机分配
+    const labelGroups = {};
+    for (let i = 0; i < annots.length; i++) {
+      const label = getAnnotLabel(annots[i]) || '__unlabeled__';
+      if (!labelGroups[label]) labelGroups[label] = [];
+      labelGroups[label].push(i);
+    }
+
+    p4Splits = { train: [], val: [], test: [] };
+
+    // 使用种子 PRNG 确保可复现
+    const rng = getSeededRandom();
+
+    for (const label in labelGroups) {
+      const indices = labelGroups[label];
+      // 对每组进行 shuffle（Fisher-Yates，使用种子 PRNG）
+      const shuffled = [...indices];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+
+      const nTrain = Math.max(1, Math.round(shuffled.length * rTrain));
+      const nVal   = Math.max(0, Math.round(shuffled.length * rVal));
+      const nTest  = shuffled.length - nTrain - nVal;
+
+      p4Splits.train.push(...shuffled.slice(0, nTrain));
+      p4Splits.val.push(...shuffled.slice(nTrain, nTrain + nVal));
+      p4Splits.test.push(...shuffled.slice(nTrain + nVal));
+    }
+
+    renderSplits();
+  }
+
+  /** 渲染 Split 分布 */
+  function renderSplits() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    if (annots.length === 0) {
+      splitContent.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">无 annotation 数据 — 加载后自动分配</div>';
+      return;
+    }
+
+    const nTrain = p4Splits.train ? p4Splits.train.length : 0;
+    const nVal   = p4Splits.val ? p4Splits.val.length : 0;
+    const nTest  = p4Splits.test ? p4Splits.test.length : 0;
+    const total  = nTrain + nVal + nTest || 1;
+
+    // 按 split 统计类别分布
+    function getLabelDistribution(indices) {
+      const dist = {};
+      for (const idx of indices) {
+        const ann = annots[idx];
+        if (!ann) continue;
+        const label = getAnnotLabel(ann) || '无标签';
+        dist[label] = (dist[label] || 0) + 1;
+      }
+      return dist;
+    }
+
+    const trainDist = getLabelDistribution(p4Splits.train || []);
+    const valDist   = getLabelDistribution(p4Splits.val || []);
+    const testDist  = getLabelDistribution(p4Splits.test || []);
+
+    let html = '';
+
+    // Split 比例编辑
+    html += '<div class="split-ratio-row">';
+    html += `<label>Train</label><input type="number" id="splitTrainRatio" value="${p4SplitRatios.train}" min="0" max="100" step="5" />%`;
+    html += `<label>Val</label><input type="number" id="splitValRatio" value="${p4SplitRatios.val}" min="0" max="100" step="5" />%`;
+    html += `<label>Test</label><input type="number" id="splitTestRatio" value="${p4SplitRatios.test}" min="0" max="100" step="5" />%`;
+    html += '</div>';
+
+    // 种子显示与设置
+    html += '<div class="split-seed-row">';
+    html += `<label>种子</label><input type="number" id="splitSeedInput" value="${p4Seed !== null ? p4Seed : ''}" placeholder="留空=自动" min="0" style="width:80px" />`;
+    html += `<span style="font-size:9px;color:var(--muted)">当前: ${p4Seed !== null ? p4Seed : '自动(' + ((Date.now() & 0xFFFFFFFF) >>> 0) + ')'}</span>`;
+    html += '</div>';
+
+    // Split 分布条
+    html += '<div class="split-dist">';
+    html += `<div class="split-item train">Train<br><span class="count">${nTrain} (${(nTrain/total*100).toFixed(0)}%)</span></div>`;
+    html += `<div class="split-item val">Val<br><span class="count">${nVal} (${(nVal/total*100).toFixed(0)}%)</span></div>`;
+    html += `<div class="split-item test">Test<br><span class="count">${nTest} (${(nTest/total*100).toFixed(0)}%)</span></div>`;
+    html += '</div>';
+
+    // 类别分布（所有 split 合并显示前几个类别）
+    html += '<div style="font-size:9px;color:var(--ink-light);margin-top:2px"><strong>类别分布:</strong></div>';
+    const allLabels = new Set([...Object.keys(trainDist), ...Object.keys(valDist), ...Object.keys(testDist)]);
+    html += '<table class="taxonomy-table"><thead><tr><th>类别</th><th>Train</th><th>Val</th><th>Test</th></tr></thead><tbody>';
+    for (const label of allLabels) {
+      html += `<tr><td style="font-size:9px">${escHtml(label)}</td>
+        <td style="text-align:center">${trainDist[label] || 0}</td>
+        <td style="text-align:center">${valDist[label] || 0}</td>
+        <td style="text-align:center">${testDist[label] || 0}</td></tr>`;
+    }
+    html += '</tbody></table>';
+
+    // 重新分配按钮
+    html += '<div style="margin-top:4px"><button class="rfml-btn rfml-btn-sm" id="reshuffleBtn">🔄 重新分配</button></div>';
+
+    splitContent.innerHTML = html;
+
+    // 绑定事件
+    ['splitTrainRatio','splitValRatio','splitTestRatio'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        // 即时校验：输入时实时显示总和提示
+        el.addEventListener('input', () => {
+          const t = parseInt(document.getElementById('splitTrainRatio').value) || 0;
+          const v = parseInt(document.getElementById('splitValRatio').value) || 0;
+          const te = parseInt(document.getElementById('splitTestRatio').value) || 0;
+          const sum = t + v + te;
+          let hint = document.getElementById('splitSumHint');
+          if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'splitSumHint';
+            hint.style.cssText = 'font-size:9px;margin-top:2px';
+            document.querySelector('.split-ratio-row')?.after(hint);
+          }
+          if (sum === 100) {
+            hint.textContent = '✅ 总和为 100%';
+            hint.style.color = 'var(--ok)';
+          } else if (sum > 100) {
+            hint.textContent = `⚠️ 超出 ${sum - 100}%（保存时将自动归一化）`;
+            hint.style.color = 'var(--danger)';
+          } else {
+            hint.textContent = `⚠️ 不足 ${100 - sum}%（保存时将自动归一化）`;
+            hint.style.color = 'var(--warn)';
+          }
+        });
+        el.addEventListener('change', () => {
+          const t = parseInt(document.getElementById('splitTrainRatio').value) || 70;
+          const v = parseInt(document.getElementById('splitValRatio').value) || 15;
+          const te = parseInt(document.getElementById('splitTestRatio').value) || 15;
+          const sum = t + v + te;
+          if (sum <= 0) {
+            p4SplitRatios = { train: 70, val: 15, test: 15 };
+          } else if (sum !== 100) {
+            // 自动归一化，将舍入误差均匀分配到各 split
+            let train = Math.round(t / sum * 100);
+            let val   = Math.round(v / sum * 100);
+            let test  = Math.round(te / sum * 100);
+            let rem = 100 - train - val - test;
+            // 将剩余的舍入误差均匀分配
+            while (rem > 0) {
+              if (train <= val && train <= test) { train++; }
+              else if (val <= test) { val++; }
+              else { test++; }
+              rem--;
+            }
+            while (rem < 0) {
+              if (train >= val && train >= test && train > 0) { train--; }
+              else if (val >= test && val > 0) { val--; }
+              else if (test > 0) { test--; }
+              rem++;
+            }
+            // 确保 Test 不为 0
+            if (test === 0 && train > 0) { train--; test++; }
+            if (test === 0 && val > 0) { val--; test++; }
+            p4SplitRatios = { train, val, test };
+          } else {
+            p4SplitRatios = { train: t, val: v, test: te };
+          }
+          computeSplits();
+          runQualityGate();
+        });
+      }
+    });
+
+    document.getElementById('reshuffleBtn')?.addEventListener('click', () => {
+      const seedInput = document.getElementById('splitSeedInput');
+      if (seedInput) {
+        const val = seedInput.value.trim();
+        if (val !== '') {
+          resetSeededRandom(parseInt(val, 10) || ((Date.now() & 0xFFFFFFFF) >>> 0));
+        } else {
+          resetSeededRandom();
+        }
+      } else {
+        resetSeededRandom();
+      }
+      computeSplits();
+      runQualityGate();
+    });
+
+    // 种子输入变更事件
+    document.getElementById('splitSeedInput')?.addEventListener('change', (e) => {
+      const val = e.target.value.trim();
+      if (val !== '') {
+        resetSeededRandom(parseInt(val, 10) || ((Date.now() & 0xFFFFFFFF) >>> 0));
+      } else {
+        resetSeededRandom();
+      }
+      computeSplits();
+      runQualityGate();
+    });
+  }
+
+  // ================================================================
+  //  3. 切片预览 (Slice Preview)
+  // ================================================================
+
+  /** 计算当前窗口内的切片 */
+  function computeSlices() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    const start = currentOffset;
+    const winSize = parseInt(windowSizeInput.value) || 4096;
+    const end = start + winSize;
+
+    p4Slices = [];
+
+    for (const ann of annots) {
+      const aStart = getAnnotStart(ann);
+      const aCount = getAnnotCount(ann);
+      const aEnd = aStart + aCount;
+      const label = getAnnotLabel(ann) || '未标注';
+
+      // 检查 annotation 是否与当前窗口有交集
+      if (aEnd <= start || aStart >= end) continue;
+
+      // 计算窗口内的有效范围
+      const sliceStart = Math.max(aStart, start);
+      const sliceEnd = Math.min(aEnd, end);
+
+      // 按 p4SliceWin 长度切分
+      let s = sliceStart;
+      while (s < sliceEnd) {
+        const sEnd = Math.min(s + p4SliceWin, sliceEnd);
+        if (sEnd - s >= Math.min(p4SliceWin, 64)) { // 至少 64 样本
+          p4Slices.push({
+            start: s,
+            end: sEnd,
+            count: sEnd - s,
+            label: label,
+            labelId: 'mod.' + label.toLowerCase().replace(/[^a-z0-9]/g, ''),
+          });
+        }
+        s += p4SliceStep;
+      }
+    }
+
+    renderSlices();
+    renderSliceOverlay();
+  }
+
+  /** 渲染切片统计信息 */
+  function renderSlices() {
+    if (p4Slices.length === 0) {
+      const annots = (currentMeta && currentMeta.annotations) || [];
+      if (annots.length === 0) {
+        sliceContent.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">无 annotation — 加载标注数据后自动生成切片</div>';
+      } else {
+        sliceContent.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">当前窗口内无切片（调整窗口位置或范围）</div>';
+      }
+      return;
+    }
+
+    // 切片配置
+    let html = '<div class="rfml-row"><label>窗口</label>';
+    html += `<input type="number" id="sliceWinInput" value="${p4SliceWin}" min="64" max="65536" step="128" />`;
+    html += '<label>步长</label>';
+    html += `<input type="number" id="sliceStepInput" value="${p4SliceStep}" min="1" max="65536" step="64" />`;
+    html += '</div>';
+
+    // 统计
+    const uniqueLabels = new Set(p4Slices.map(s => s.label));
+    html += `<div class="slice-info">切片: <span>${p4Slices.length}</span> · 类别: <span>${uniqueLabels.size}</span></div>`;
+
+    // 按 label 聚合
+    const labelCounts = {};
+    for (const s of p4Slices) {
+      labelCounts[s.label] = (labelCounts[s.label] || 0) + 1;
+    }
+    html += '<div style="font-size:9px;max-height:80px;overflow-y:auto">';
+    for (const [label, count] of Object.entries(labelCounts)) {
+      html += `<div style="display:flex;justify-content:space-between;padding:1px 0">
+        <span>${escHtml(label)}</span><span style="color:var(--muted)">${count}</span>
+      </div>`;
+    }
+    html += '</div>';
+
+    // 刷新按钮
+    html += '<div style="margin-top:4px"><button class="rfml-btn rfml-btn-sm" id="refreshSlicesBtn">🔄 刷新切片</button></div>';
+
+    sliceContent.innerHTML = html;
+
+    document.getElementById('sliceWinInput')?.addEventListener('change', (e) => {
+      p4SliceWin = Math.max(64, parseInt(e.target.value) || 1024);
+      computeSlices();
+    });
+    document.getElementById('sliceStepInput')?.addEventListener('change', (e) => {
+      p4SliceStep = Math.max(1, parseInt(e.target.value) || 512);
+      computeSlices();
+    });
+    document.getElementById('refreshSlicesBtn')?.addEventListener('click', computeSlices);
+  }
+
+  /** 在瀑布图上叠加显示切片矩形 */
+  function renderSliceOverlay() {
+    const specDiv = specPlotDiv;
+    if (!specDiv || p4Slices.length === 0) return;
+
+    const fs = currentFs || sampleRate || 81920000;
+    const startTime = currentOffset / fs;
+    const shapes = [];
+
+    // 获取频率范围
+    let freqMin = 0, freqMax = fs / 2;
+    try {
+      const layout = specDiv.layout;
+      if (layout && layout.yaxis) {
+        if (layout.yaxis.range) {
+          freqMin = layout.yaxis.range[0];
+          freqMax = layout.yaxis.range[1];
+        }
+      }
+    } catch (e) { /* 使用默认值 */ }
+
+    // 最多显示 50 个切片矩形避免性能问题
+    const displaySlices = p4Slices.slice(0, 50);
+
+    // 预计算 label→颜色 映射表（避免 O(n²) 重复计算）
+    const labelColorMap = new Map();
+    let colorIdx = 0;
+    for (const slice of displaySlices) {
+      if (!labelColorMap.has(slice.label)) {
+        labelColorMap.set(slice.label, TAXONOMY_COLORS[colorIdx % TAXONOMY_COLORS.length]);
+        colorIdx++;
+      }
+    }
+
+    for (const slice of displaySlices) {
+      const tStart = slice.start / fs;
+      const tEnd   = slice.end / fs;
+
+      // 使用预计算的映射表获取颜色
+      const color = labelColorMap.get(slice.label) || TAXONOMY_COLORS[0];
+
+      shapes.push({
+        type: 'rect',
+        xref: 'x', yref: 'y',
+        x0: tStart, y0: freqMin,
+        x1: tEnd, y1: freqMax,
+        line: { color: color, width: 1.5, dash: 'dot' },
+        fillcolor: hexToRgba(color, 0.08),
+      });
+    }
+
+    if (shapes.length > 0) {
+      try {
+        Plotly.relayout(specDiv, { shapes: shapes });
+      } catch (e) {
+        // 忽略 relayout 错误
+      }
+    }
+  }
+
+  // ================================================================
+  //  4. Manifest 导出
+  // ================================================================
+
+  /** 生成 RFML manifest 行 */
+  function generateManifestRows() {
+    if (!currentMeta || !currentData) return [];
+    const annots = currentMeta.annotations || [];
+    if (annots.length === 0) return [];
+
+    const fs = sampleRate || 81920000;
+    const dataFileName2 = dataFileName || 'unknown.sigmf-data';
+    const rows = [];
+
+    // 从 metadata 获取 datatype
+    const global = currentMeta.global || {};
+    const sampleDtype = global['core:datatype'] ?? global['datatype'] ?? 'cf32_le';
+
+    // 从文件名生成 asset_id
+    const assetId = (metaFileName || dataFileName2 || 'unknown')
+      .replace(/\.sigmf-meta$/i, '')
+      .replace(/\.sigmf-data$/i, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // 对每个 annotation 生成 manifest 行
+    for (let i = 0; i < annots.length; i++) {
+      const ann = annots[i];
+      const aStart = getAnnotStart(ann);
+      const aCount = getAnnotCount(ann);
+      const label = getAnnotLabel(ann) || 'unlabeled';
+
+      // 确定 split
+      let split = 'train';
+      if (p4Splits.train && p4Splits.train.includes(i)) split = 'train';
+      else if (p4Splits.val && p4Splits.val.includes(i)) split = 'val';
+      else if (p4Splits.test && p4Splits.test.includes(i)) split = 'test';
+
+      // 确定 label_id
+      const taxItem = p4Taxonomy.find(t => t.name === label);
+      const labelId = taxItem ? taxItem.id : 'custom.' + label.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+
+      // SNR（从 SigMF 全局或 annotation 中读取）
+      const global = currentMeta.global || {};
+      const snrDb = ann['core:snr'] ?? ann['snr'] ?? ann['snr_db'] ?? global['core:snr'] ?? null;
+
+      rows.push({
+        source_uri: 'file:///' + dataFileName2 + '#sample_' + aStart,
+        sample_start: aStart,
+        sample_count: aCount ?? 1024,
+        // P4 补充字段
+        asset_id: assetId,
+        format: 'sigmf',
+        frame_index: i,
+        sample_dtype: sampleDtype,
+        label_id: labelId,
+        label_name: label,
+        snr_db: snrDb !== null ? parseFloat(snrDb) : null,
+        split: split,
+      });
+    }
+
+    return rows;
+  }
+
+  /** 导出 JSONL manifest */
+  function exportJSONL() {
+    const rows = generateManifestRows();
+    if (rows.length === 0) {
+      setStatus('没有可导出的 annotation 数据', 'warn');
+      return;
+    }
+
+    // 运行门禁检查
+    runQualityGate();
+    if (!p4GatePassed) {
+      setStatus('❌ 质量门禁未通过 — 请修复问题后再导出', 'err');
+      return;
+    }
+
+    const lines = rows.map(r => JSON.stringify(r));
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'application/jsonl' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (metaFileName || 'export').replace(/\..*$/, '') + '_rfml_manifest.jsonl';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus(`✅ 已导出 JSONL manifest (${rows.length} 条)`, 'ok');
+  }
+
+  /** 导出 CSV manifest */
+  function exportCSV() {
+    const rows = generateManifestRows();
+    if (rows.length === 0) {
+      setStatus('没有可导出的 annotation 数据', 'warn');
+      return;
+    }
+
+    // 运行门禁检查
+    runQualityGate();
+    if (!p4GatePassed) {
+      setStatus('❌ 质量门禁未通过 — 请修复问题后再导出', 'err');
+      return;
+    }
+
+    const headers = ['source_uri','sample_start','sample_count','asset_id','format','frame_index','sample_dtype','label_id','label_name','snr_db','split'];
+    const csvRows = [headers.join(',')];
+    // CSV 字段引用函数：确保所有字符串字段有双引号包裹，防止逗号/换行符导致列错位
+    const csvQuote = (val) => {
+      const s = val !== null && val !== undefined ? String(val) : '';
+      return '"' + s.replace(/"/g, '""') + '"';
+    };
+    for (const r of rows) {
+      csvRows.push([
+        csvQuote(r.source_uri),
+        csvQuote(r.sample_start),
+        csvQuote(r.sample_count),
+        csvQuote(r.asset_id),
+        csvQuote(r.format),
+        csvQuote(r.frame_index),
+        csvQuote(r.sample_dtype),
+        csvQuote(r.label_id),
+        csvQuote(r.label_name),
+        csvQuote(r.snr_db !== null ? r.snr_db : ''),
+        csvQuote(r.split),
+      ].join(','));
+    }
+
+    const content = csvRows.join('\n');
+    const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (metaFileName || 'export').replace(/\..*$/, '') + '_rfml_manifest.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus(`✅ 已导出 CSV manifest (${rows.length} 条)`, 'ok');
+  }
+
+  /** 渲染 Manifest 导出面板 */
+  function renderManifest() {
+    const rows = generateManifestRows();
+    const hasAnnots = rows.length > 0;
+    const gateOk = p4GatePassed;
+
+    let html = '';
+
+    if (!hasAnnots) {
+      html += '<div style="font-size:10px;color:var(--muted);padding:4px 0;text-align:center">加载 annotation 数据后才可导出</div>';
+      manifestContent.innerHTML = html;
+      return;
+    }
+
+    html += `<div style="font-size:10px;color:var(--ink-light)">待导出: <strong>${rows.length}</strong> 条</div>`;
+    html += '<div style="font-size:9px;color:var(--muted);margin-bottom:4px">字段: source_uri, sample_start, sample_count, asset_id, format, frame_index, sample_dtype, label_id, label_name, snr_db, split</div>';
+
+    // 门禁状态简示
+    if (gateOk) {
+      html += '<div style="font-size:10px;color:var(--ok);margin-bottom:4px">✅ 门禁通过 — 可导出</div>';
+    } else {
+      html += '<div style="font-size:10px;color:var(--danger);margin-bottom:4px">❌ 门禁未通过 — 请先修复</div>';
+    }
+
+    html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+    html += `<button class="rfml-btn rfml-btn-sm" id="exportJSONLBtn" ${gateOk ? '' : 'disabled style="opacity:0.5;cursor:not-allowed"'}>导出 JSONL</button>`;
+    html += `<button class="rfml-btn rfml-btn-sm rfml-btn-outline" id="exportCSVBtn" ${gateOk ? '' : 'disabled style="opacity:0.5;cursor:not-allowed"'}>导出 CSV</button>`;
+    html += '</div>';
+
+    // manifest 示例预览
+    if (rows.length > 0) {
+      html += '<div style="font-size:9px;color:var(--muted);margin-top:4px">预览 (首条):</div>';
+      html += `<div style="font-size:8px;font-family:monospace;background:var(--panel);padding:3px;border-radius:3px;border:1px solid var(--line);word-break:break-all;max-height:40px;overflow:hidden">${escHtml(JSON.stringify(rows[0]))}</div>`;
+    }
+
+    manifestContent.innerHTML = html;
+
+    document.getElementById('exportJSONLBtn')?.addEventListener('click', exportJSONL);
+    document.getElementById('exportCSVBtn')?.addEventListener('click', exportCSV);
+  }
+
+  // ================================================================
+  //  5. 质量门禁 (Quality Gate)
+  // ================================================================
+
+  /** 运行质量门禁检查 */
+  function runQualityGate() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    const totalSamples = currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : 0;
+    const global = currentMeta ? (currentMeta.global || {}) : {};
+
+    // 5.1 标签覆盖: 有 annotation 的数据占比 >= 80%
+    let labeledSamples = 0;
+    for (const ann of annots) {
+      labeledSamples += getAnnotCount(ann) || 0;
+    }
+    const coveragePct = totalSamples > 0 ? (labeledSamples / totalSamples * 100) : 0;
+    const labelCoverage = {
+      pass: coveragePct >= 80,
+      warn: coveragePct >= 50 && coveragePct < 80,
+      fail: coveragePct < 50,
+      detail: `标注覆盖 ${coveragePct.toFixed(1)}% (${fmtNum(labeledSamples)} / ${fmtNum(totalSamples)} 样本)`
+    };
+
+    // 5.2 类别均衡: 最大/最小类别样本比 <= 10
+    const labelCounts = {};
+    for (const ann of annots) {
+      const label = getAnnotLabel(ann) || '__unlabeled__';
+      const cnt = getAnnotCount(ann) || 0;
+      labelCounts[label] = (labelCounts[label] || 0) + cnt;
+    }
+    const counts = Object.values(labelCounts).filter(c => c > 0);
+    let classBalance = { pass: true, warn: false, fail: false, detail: '无类别数据' };
+    if (counts.length >= 2) {
+      const maxC = Math.max(...counts);
+      const minC = Math.min(...counts);
+      const ratio = minC > 0 ? maxC / minC : Infinity;
+      classBalance = {
+        pass: ratio <= 10,
+        warn: ratio > 10 && ratio <= 20,
+        fail: ratio > 20,
+        detail: `最大/最小类别比 ${ratio.toFixed(1)} (最大: ${maxC}, 最小: ${minC})`
+      };
+    } else if (counts.length === 1) {
+      classBalance = { pass: true, warn: false, fail: false, detail: '仅一个类别 (无需均衡检查)' };
+    }
+
+    // 5.3 数据一致性: .sigmf-meta 与 .sigmf-data 匹配
+    let dataConsistency = { pass: true, warn: false, fail: false, detail: '' };
+    if (currentMeta && currentData) {
+      const declaredLenRaw = global['core:sample_count'] ?? global['traceability:sample_length'] ?? global['sample_count'] ?? null;
+      if (declaredLenRaw !== null) {
+        const declaredLen = toFiniteNumber(declaredLenRaw, NaN);
+        const actualLen = Math.floor(currentData.byteLength / SAMPLE_BYTES);
+        if (!Number.isFinite(declaredLen) || declaredLen !== actualLen) {
+          dataConsistency = {
+            pass: false,
+            warn: false,
+            fail: true,
+            detail: `声明 ${fmtNum(declaredLenRaw)} 样本, 实际 ${fmtNum(actualLen)} 样本`
+          };
+        } else {
+          dataConsistency = { pass: true, warn: false, fail: false, detail: `一致 (${fmtNum(actualLen)} 样本)` };
+        }
+      } else {
+        dataConsistency = { pass: true, warn: true, fail: false, detail: 'meta 中未声明 sample_count (跳过检查)' };
+      }
+    }
+
+    // 5.4 Split 无泄漏: 同一信号不跨 split
+    let noLeakage = { pass: true, warn: false, fail: false, detail: '无泄漏检测' };
+    if (p4Splits.train && p4Splits.val && p4Splits.test) {
+      const totalInSplits = p4Splits.train.length + p4Splits.val.length + p4Splits.test.length;
+      // 检查是否有重复索引
+      const allIndices = [...p4Splits.train, ...p4Splits.val, ...p4Splits.test];
+      const uniqueIndices = new Set(allIndices);
+      if (totalInSplits !== annots.length) {
+        noLeakage = { pass: false, warn: false, fail: true, detail: `Split 数量 ${totalInSplits} 与 annotation 数量 ${annots.length} 不一致` };
+      } else if (allIndices.length !== uniqueIndices.size) {
+        noLeakage = { pass: false, warn: false, fail: true, detail: '检测到重复索引 — 存在跨 split 泄漏' };
+      } else {
+        noLeakage = { pass: true, warn: false, fail: false, detail: `${totalInSplits} 条标注, 无重复` };
+      }
+    }
+
+    p4GateResults = { labelCoverage, classBalance, dataConsistency, noLeakage };
+
+    // 综合判定: 所有项必须 pass（warn 允许, fail 阻塞）
+    p4GatePassed = !labelCoverage.fail && !classBalance.fail && !dataConsistency.fail && !noLeakage.fail;
+
+    renderGate();
+    renderManifest();
+  }
+
+  /** 渲染质量门禁面板 */
+  function renderGate() {
+    const results = p4GateResults;
+    if (!results || Object.keys(results).length === 0) {
+      gateContent.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:8px 0;text-align:center">导出前自动运行门禁检查</div>';
+      return;
+    }
+
+    const items = [
+      { key: 'labelCoverage',  label: '标签覆盖 ≥ 80%', status: results.labelCoverage },
+      { key: 'classBalance',   label: '类别均衡 ≤ 10x', status: results.classBalance },
+      { key: 'dataConsistency',label: '数据一致性',     status: results.dataConsistency },
+      { key: 'noLeakage',      label: 'Split 无泄漏',    status: results.noLeakage },
+    ];
+
+    let html = '<div class="gate-list">';
+
+    for (const item of items) {
+      const s = item.status;
+      let icon = '⏳', cls = '';
+      if (s.pass) { icon = '✅'; cls = 'pass'; }
+      else if (s.warn) { icon = '⚠️'; cls = 'warn'; }
+      else if (s.fail) { icon = '❌'; cls = 'fail'; }
+
+      html += `<div class="gate-item ${cls}">
+        <span class="gate-icon">${icon}</span>
+        <span class="gate-label">${item.label}</span>
+        <span class="gate-detail">${escHtml(s.detail)}</span>
+      </div>`;
+    }
+
+    html += '</div>';
+
+    // 综合状态
+    const allPass = items.every(i => i.status.pass);
+    const anyFail = items.some(i => i.status.fail);
+    let summaryIcon = '✅', summaryText = '全部通过 — 可导出';
+    if (anyFail) { summaryIcon = '❌'; summaryText = '存在失败项 — 无法导出'; }
+    else if (!allPass) { summaryIcon = '⚠️'; summaryText = '存在警告 — 建议修复后导出'; }
+
+    html += `<div class="gate-summary ${anyFail ? 'fail' : 'pass'}">
+      <span>${summaryIcon}</span>
+      <span>${summaryText}</span>
+    </div>`;
+
+    // 刷新按钮
+    html += '<div style="margin-top:4px"><button class="rfml-btn rfml-btn-sm rfml-btn-outline" id="rerunGateBtn">🔄 重新检查</button></div>';
+
+    gateContent.innerHTML = html;
+
+    document.getElementById('rerunGateBtn')?.addEventListener('click', runQualityGate);
+  }
+
+  // ================================================================
+  //  P4 集成: 数据加载后自动更新
+  // ================================================================
+
+  /** 更新所有 P4 面板 */
+  function updateP4Panels() {
+    if (!currentMeta || !currentData) return;
+
+    // 1. Taxonomy
+    buildTaxonomy();
+
+    // 2. Splits（首次分配）
+    if (!p4Splits.train || p4Splits.train.length === 0) {
+      computeSplits();
+    } else {
+      renderSplits();
+    }
+
+    // 3. 切片
+    computeSlices();
+
+    // 4. 门禁
+    runQualityGate();
+
+    // 5. Manifest
+    renderManifest();
+  }
+
+  /* ===================================================================
+     P5 扩展能力 — 当前单文件架构中的可落地协作能力
+     =================================================================== */
+
+  function setRemoteStatus(text, type) {
+    if (!remoteStatus) return;
+    remoteStatus.textContent = text;
+    remoteStatus.style.color = type === 'err' ? 'var(--danger)' : type === 'ok' ? 'var(--ok)' : 'var(--muted)';
+  }
+
+  function assetBaseName(name) {
+    return (name || 'asset')
+      .replace(/^.*\//, '')
+      .replace(/\.sigmf-meta$/i, '')
+      .replace(/\.sigmf-data$/i, '')
+      .replace(/\.[^.]+$/i, '');
+  }
+
+  async function fetchJson(url) {
+    // 为远程元数据请求设置 30 秒超时，避免无响应连接长期挂起。
+    const signal = AbortSignal.timeout(30000);
+    const resp = await fetch(url, { mode: 'cors', signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    return resp.json();
+  }
+
+  async function fetchBinary(url) {
+    // 为远程二进制数据请求设置 30 秒超时，避免无响应连接长期挂起。
+    const signal = AbortSignal.timeout(30000);
+    const resp = await fetch(url, { mode: 'cors', signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    return resp.arrayBuffer();
+  }
+
+  function deriveSigMFDataUrl(metaUrl) {
+    if (!metaUrl) return '';
+    if (/\.sigmf-meta($|\?)/i.test(metaUrl)) return metaUrl.replace(/\.sigmf-meta(?=$|\?)/i, '.sigmf-data');
+    return metaUrl.replace(/(\?.*)?$/, '.sigmf-data$1');
+  }
+
+  async function loadRemoteSigMF() {
+    const metaUrl = remoteMetaUrlInput.value.trim();
+    const dataUrl = remoteDataUrlInput.value.trim() || deriveSigMFDataUrl(metaUrl);
+    if (!metaUrl || !dataUrl) {
+      setStatus('请填写远程 meta/data URL', 'warn');
+      setRemoteStatus('Meta URL 和 Data URL 均不能为空。', 'err');
+      return;
+    }
+
+    showProgress(true);
+    setRemoteStatus('正在 fetch 远程 meta 与 data…', 'ok');
+    setStatus('正在加载远程 SigMF…', 'ok');
+    try {
+      const [metaRaw, dataBuf] = await Promise.all([fetchJson(metaUrl), fetchBinary(dataUrl)]);
+      const meta = normalizeSigMFMeta(metaRaw);
+      currentMeta = meta;
+      originalMeta = deepClone(meta);
+      currentData = dataBuf;
+      sampleCount = Math.floor(currentData.byteLength / SAMPLE_BYTES);
+      metaFileName = assetBaseName(metaUrl) + '.sigmf-meta';
+      dataFileName = assetBaseName(dataUrl) + '.sigmf-data';
+      hasMods = false;
+
+      const global = meta.global || {};
+      sampleRate = toFiniteNumber(global['core:sample_rate'] ?? global['sample_rate'], 81920000);
+      captures = meta.captures || [];
+      annotations = meta.annotations || [];
+      predictionMeta = null;
+      predictionName = '';
+
+      fileNameLabel.textContent = metaFileName + ' → ' + dataFileName;
+      fileNameLabel.title = metaUrl + '\n' + dataUrl;
+      clearModified();
+      renderEditableMetaPanel(meta);
+      await loadAndVisualize();
+      updateP4Panels();
+      updateP5Panels();
+      setRemoteStatus(`已加载 ${fmtNum(sampleCount)} 样本。`, 'ok');
+    } catch (err) {
+      setStatus('远程加载失败: ' + err.message, 'err');
+      setRemoteStatus('远程加载失败：' + err.message, 'err');
+      console.error(err);
+    } finally {
+      showProgress(false);
+    }
+  }
+
+  function getReviewStatus(ann) {
+    return ann['rfview:review_status'] ?? ann['review_status'] ?? 'pending';
+  }
+
+  function setReviewFields(ann, status, reviewer, note) {
+    ann['rfview:review_status'] = status || 'pending';
+    if (reviewer) ann['rfview:reviewer'] = reviewer; else delete ann['rfview:reviewer'];
+    if (note) ann['rfview:review_note'] = note; else delete ann['rfview:review_note'];
+    ann['rfview:reviewed_at'] = new Date().toISOString();
+  }
+
+  function getVisibleAnnotationIndices() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    const start = parseInt(startSampleInput.value, 10) || 0;
+    const win = parseInt(windowSizeInput.value, 10) || 4096;
+    const end = start + win;
+    const indices = [];
+    for (let i = 0; i < annots.length; i++) {
+      const aStart = getAnnotStart(annots[i]);
+      const aEnd = aStart + getAnnotCount(annots[i]);
+      if (aEnd > start && aStart < end) indices.push(i);
+    }
+    return indices;
+  }
+
+  function applyBulkReview(onlyVisible) {
+    if (!currentMeta || !currentMeta.annotations || currentMeta.annotations.length === 0) {
+      setStatus('没有可复核的 annotation', 'warn');
+      return;
+    }
+    const status = bulkReviewStatus.value || 'pending';
+    const reviewer = reviewerInput.value.trim();
+    const note = bulkReviewNote.value.trim();
+    const indices = onlyVisible ? getVisibleAnnotationIndices() : currentMeta.annotations.map((_, i) => i);
+    for (const idx of indices) {
+      setReviewFields(currentMeta.annotations[idx], status, reviewer, note);
+    }
+    markModified();
+    renderEditableMetaPanel(currentMeta);
+    if (currentI) loadAndVisualize();
+    updateP5Panels();
+    setStatus(`已批量更新 ${indices.length} 条复核状态为 ${status}`, 'ok');
+  }
+
+  function reviewStats() {
+    const annots = (currentMeta && currentMeta.annotations) || [];
+    const stats = { pending: 0, approved: 0, rejected: 0 };
+    for (const ann of annots) {
+      const s = getReviewStatus(ann);
+      stats[s] = (stats[s] || 0) + 1;
+    }
+    return { total: annots.length, stats };
+  }
+
+  function renderReviewPanel() {
+    const { total, stats } = reviewStats();
+    reviewBadge.textContent = `${stats.approved || 0}/${total}`;
+    if (total === 0) {
+      reviewContent.innerHTML = '加载标注后显示复核状态。';
+      return;
+    }
+    const rows = [
+      ['approved', stats.approved || 0],
+      ['pending', stats.pending || 0],
+      ['rejected', stats.rejected || 0],
+    ];
+    reviewContent.innerHTML = rows.map(([status, count]) =>
+      `<div class="p5-mini-item"><span><span class="review-badge ${status}">${status}</span></span><strong>${count}</strong></div>`
+    ).join('');
+  }
+
+  function addCurrentAssetToBatch() {
+    if (!currentMeta || !currentData) {
+      setStatus('请先加载一个完整资产', 'warn');
+      return;
+    }
+    runQualityGate();
+    const id = assetBaseName(metaFileName || dataFileName || `asset_${batchAssets.length + 1}`);
+    const existingIdx = batchAssets.findIndex(a => a.asset_id === id);
+    const rows = generateManifestRows();
+    const asset = {
+      asset_id: id,
+      meta_file: metaFileName || 'unknown.sigmf-meta',
+      data_file: dataFileName || 'unknown.sigmf-data',
+      sample_count: sampleCount,
+      sample_rate: sampleRate,
+      annotation_count: (currentMeta.annotations || []).length,
+      manifest_rows: rows,
+      gate_passed: p4GatePassed,
+      gate_results: deepClone(p4GateResults),
+      review: reviewStats(),
+      captured_at: new Date().toISOString(),
+    };
+    if (existingIdx >= 0) batchAssets[existingIdx] = asset;
+    else batchAssets.push(asset);
+    renderBatchPanel();
+    setStatus(`已加入批处理: ${id}`, 'ok');
+  }
+
+  function renderBatchPanel() {
+    const totalRows = batchAssets.reduce((sum, a) => sum + (a.manifest_rows ? a.manifest_rows.length : 0), 0);
+    batchAssetCount.textContent = String(batchAssets.length);
+    batchManifestCount.textContent = String(totalRows);
+    if (batchAssets.length === 0) {
+      batchContent.innerHTML = '尚未加入资产。';
+      return;
+    }
+    batchContent.innerHTML = batchAssets.map(a => {
+      const cls = a.gate_passed ? 'approved' : 'rejected';
+      const gate = a.gate_passed ? 'gate pass' : 'gate fail';
+      return `<div class="p5-mini-item"><span title="${escHtml(a.meta_file)}">${escHtml(a.asset_id)} · ${a.annotation_count} ann</span><strong class="review-badge ${cls}">${gate}</strong></div>`;
+    }).join('');
+  }
+
+  function exportBatchManifest() {
+    const rows = batchAssets.flatMap(a => (a.manifest_rows || []).map(r => ({ ...r, batch_asset_id: a.asset_id })));
+    if (rows.length === 0) {
+      setStatus('批处理 manifest 为空', 'warn');
+      return;
+    }
+    const content = rows.map(r => JSON.stringify(r)).join('\n');
+    downloadText(content, 'rfview_batch_manifest.jsonl', 'application/jsonl');
+    setStatus(`已导出批处理 manifest (${rows.length} 行)`, 'ok');
+  }
+
+  function exportBatchReport() {
+    if (batchAssets.length === 0) {
+      setStatus('批处理资产为空', 'warn');
+      return;
+    }
+    const report = {
+      rfview_phase: 'P5',
+      generated_at: new Date().toISOString(),
+      asset_count: batchAssets.length,
+      manifest_rows: batchAssets.reduce((sum, a) => sum + (a.manifest_rows ? a.manifest_rows.length : 0), 0),
+      passed_assets: batchAssets.filter(a => a.gate_passed).length,
+      failed_assets: batchAssets.filter(a => !a.gate_passed).length,
+      assets: batchAssets,
+    };
+    downloadJSON(report, 'rfview_batch_quality_report.json');
+    setStatus('已导出批处理质量报告', 'ok');
+  }
+
+  function downloadText(content, filename, type) {
+    const blob = new Blob([content], { type: type || 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function appendPredictionTimelineBars(sampleOffset, windowSize) {
+    const preds = (predictionMeta && predictionMeta.annotations) || [];
+    if (preds.length === 0) return { html: '', count: 0 };
+    let html = '';
+    let count = 0;
+    const windowEnd = sampleOffset + windowSize;
+    for (let idx = 0; idx < preds.length; idx++) {
+      const ann = preds[idx];
+      const start = getAnnotStart(ann);
+      const aCount = getAnnotCount(ann);
+      const end = start + aCount;
+      if (end <= sampleOffset || start >= windowEnd) continue;
+      count++;
+      const label = getAnnotLabel(ann) || `预测 #${idx + 1}`;
+      html += `<div class="annot-bar prediction-bar" data-sample-start="${start}" data-sample-count="${aCount}">
+        <div class="annot-color" style="background:#9333ea"></div>
+        <span class="annot-label">预测: ${escHtml(label)}</span>
+        <span class="annot-range">#${fmtNum(start)} · ${fmtNum(aCount)} 样本</span>
+        <span class="annot-freq">${ann['rfview:confidence'] !== undefined ? 'conf ' + escHtml(String(ann['rfview:confidence'])) : ''}</span>
+      </div>`;
+    }
+    return { html, count };
+  }
+
+  function comparePredictions() {
+    const truth = (currentMeta && currentMeta.annotations) || [];
+    const preds = (predictionMeta && predictionMeta.annotations) || [];
+    const rows = [];
+    for (let i = 0; i < preds.length; i++) {
+      const p = preds[i];
+      const pStart = getAnnotStart(p);
+      const pEnd = pStart + getAnnotCount(p);
+      const pLabel = getAnnotLabel(p);
+      let best = null;
+      for (let j = 0; j < truth.length; j++) {
+        const t = truth[j];
+        const tStart = getAnnotStart(t);
+        const tEnd = tStart + getAnnotCount(t);
+        const overlap = Math.max(0, Math.min(pEnd, tEnd) - Math.max(pStart, tStart));
+        const union = Math.max(pEnd, tEnd) - Math.min(pStart, tStart);
+        const iou = union > 0 ? overlap / union : 0;
+        if (!best || iou > best.iou) best = { index: j, iou, label: getAnnotLabel(t) };
+      }
+      rows.push({
+        prediction_index: i,
+        prediction_label: pLabel,
+        prediction_confidence: p['rfview:confidence'],
+        matched_truth_index: best ? best.index : null,
+        truth_label: best ? best.label : null,
+        label_match: best ? best.label === pLabel : false,
+        time_iou: best ? Number(best.iou.toFixed(4)) : 0,
+      });
+    }
+    return rows;
+  }
+
+  function renderPredictionPanel() {
+    const preds = (predictionMeta && predictionMeta.annotations) || [];
+    if (preds.length === 0) {
+      predictionContent.innerHTML = '可加载第二个 SigMF meta，作为模型预测叠加到时间轴。';
+      return;
+    }
+    const rows = comparePredictions();
+    const matched = rows.filter(r => r.time_iou > 0).length;
+    const labelOk = rows.filter(r => r.label_match).length;
+    predictionContent.innerHTML = `
+      <div class="p5-mini-item"><span>${escHtml(predictionName || 'prediction')}</span><strong>${preds.length} pred</strong></div>
+      <div class="p5-mini-item"><span>时间重叠</span><strong>${matched}/${preds.length}</strong></div>
+      <div class="p5-mini-item"><span>标签一致</span><strong>${labelOk}/${preds.length}</strong></div>
+    `;
+  }
+
+  function exportPredictionCompare() {
+    const rows = comparePredictions();
+    if (rows.length === 0) {
+      setStatus('没有预测标注可导出', 'warn');
+      return;
+    }
+    const report = {
+      truth_meta: metaFileName,
+      prediction_meta: predictionName,
+      generated_at: new Date().toISOString(),
+      rows,
+    };
+    downloadJSON(report, 'rfview_prediction_compare.json');
+    setStatus(`已导出预测对比 (${rows.length} 行)`, 'ok');
+  }
+
+  function renderStatsPanel() {
+    if (!currentMeta) {
+      statsContent.innerHTML = '<div style="font-size:10px;color:var(--muted)">加载数据后显示统计摘要。</div>';
+      return;
+    }
+    const annots = currentMeta.annotations || [];
+    const labelCounts = {};
+    const snrs = [];
+    let labeledSamples = 0;
+    for (const ann of annots) {
+      const label = getAnnotLabel(ann) || '未标注';
+      const cnt = getAnnotCount(ann) || 0;
+      labelCounts[label] = (labelCounts[label] || 0) + cnt;
+      labeledSamples += cnt;
+      const snr = ann['core:snr'] ?? ann['snr'] ?? ann['snr_db'];
+      if (snr !== undefined && snr !== null && Number.isFinite(Number(snr))) snrs.push(Number(snr));
+    }
+    const total = sampleCount || (currentData ? Math.floor(currentData.byteLength / SAMPLE_BYTES) : 0);
+    const duration = sampleRate > 0 && total > 0 ? total / sampleRate : 0;
+    const snrMin = snrs.length ? Math.min(...snrs).toFixed(1) : '—';
+    const snrMax = snrs.length ? Math.max(...snrs).toFixed(1) : '—';
+    const snrMean = snrs.length ? (snrs.reduce((a, b) => a + b, 0) / snrs.length).toFixed(1) : '—';
+    const review = reviewStats();
+    const topLabels = Object.entries(labelCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    statsContent.innerHTML = `
+      <div class="p5-kpi-grid">
+        <div class="p5-kpi"><div class="num">${fmtNum(total)}</div><div class="label">总样本</div></div>
+        <div class="p5-kpi"><div class="num">${duration ? duration.toFixed(3) + 's' : '—'}</div><div class="label">样本时长</div></div>
+        <div class="p5-kpi"><div class="num">${annots.length}</div><div class="label">标注片段</div></div>
+        <div class="p5-kpi"><div class="num">${total ? (labeledSamples / total * 100).toFixed(1) + '%' : '—'}</div><div class="label">覆盖率</div></div>
+      </div>
+      <div class="p5-mini-list">
+        <div class="p5-mini-item"><span>SNR min/mean/max</span><strong>${snrMin}/${snrMean}/${snrMax}</strong></div>
+        <div class="p5-mini-item"><span>复核 approved/pending/rejected</span><strong>${review.stats.approved || 0}/${review.stats.pending || 0}/${review.stats.rejected || 0}</strong></div>
+        ${topLabels.map(([label, count]) => `<div class="p5-mini-item"><span>${escHtml(label)}</span><strong>${fmtNum(count)}</strong></div>`).join('')}
+      </div>
+    `;
+  }
+
+  function updateP5Panels() {
+    renderReviewPanel();
+    renderBatchPanel();
+    renderPredictionPanel();
+    renderStatsPanel();
+  }
+
+  function initP5() {
+    p5Header.addEventListener('click', () => p5Panel.classList.toggle('collapsed'));
+    deriveDataUrlBtn.addEventListener('click', () => {
+      remoteDataUrlInput.value = deriveSigMFDataUrl(remoteMetaUrlInput.value.trim());
+      setRemoteStatus('已根据 Meta URL 推断 Data URL。', 'ok');
+    });
+    loadRemoteBtn.addEventListener('click', loadRemoteSigMF);
+    applyBulkReviewBtn.addEventListener('click', () => applyBulkReview(false));
+    applyVisibleReviewBtn.addEventListener('click', () => applyBulkReview(true));
+    addBatchAssetBtn.addEventListener('click', addCurrentAssetToBatch);
+    clearBatchBtn.addEventListener('click', () => {
+      batchAssets = [];
+      renderBatchPanel();
+      setStatus('已清空批处理列表', 'ok');
+    });
+    exportBatchManifestBtn.addEventListener('click', exportBatchManifest);
+    exportBatchReportBtn.addEventListener('click', exportBatchReport);
+    loadPredictionBtn.addEventListener('click', () => predictionFileInput.click());
+    predictionFileInput.addEventListener('change', async () => {
+      const file = predictionFileInput.files && predictionFileInput.files[0];
+      if (!file) return;
+      try {
+        predictionMeta = normalizeSigMFMeta(await loadMetaFile(file));
+        predictionName = file.name;
+        renderPredictionPanel();
+        if (currentI) loadAndVisualize();
+        setStatus(`已加载预测标注: ${file.name}`, 'ok');
+      } catch (err) {
+        setStatus('预测 meta 解析失败: ' + err.message, 'err');
+      } finally {
+        predictionFileInput.value = '';
+      }
+    });
+    clearPredictionBtn.addEventListener('click', () => {
+      predictionMeta = null;
+      predictionName = '';
+      renderPredictionPanel();
+      if (currentI) loadAndVisualize();
+    });
+    exportCompareBtn.addEventListener('click', exportPredictionCompare);
+    updateP5Panels();
+    console.log('🧩 P5 扩展能力已加载');
+  }
+
+  // ---- 在 loadAndVisualize 后联动更新切片 ----
+  // 保存原有引用
+  const _origP4LoadAndVisualize = loadAndVisualize;
+  loadAndVisualize = async function() {
+    await _origP4LoadAndVisualize.call(this);
+    // 更新切片（如果数据已加载）
+    if (currentData && currentMeta) {
+      computeSlices();
+      updateP5Panels();
+    }
+  };
+
+  // ---- 在 handleFileSelect 后联动更新所有 P4 面板 ----
+  const _origP4HandleFileSelect = handleFileSelect;
+  handleFileSelect = async function(file) {
+    await _origP4HandleFileSelect.call(this, file);
+    // 如果数据已全部加载，更新 P4 面板
+    if (currentData && currentMeta) {
+      // 延迟一帧确保界面已更新
+      setTimeout(() => { updateP4Panels(); updateP5Panels(); }, 100);
+    }
+  };
+
+  // ---- 在 handleDataFile 后联动更新 ----
+  const _origP4HandleDataFile = handleDataFile;
+  handleDataFile = async function(file) {
+    await _origP4HandleDataFile.call(this, file);
+    if (currentData && currentMeta) {
+      setTimeout(() => { updateP4Panels(); updateP5Panels(); }, 100);
+    }
+  };
+
+  // ---- P4 事件: 折叠/展开 ----
+  rfmlHeader.addEventListener('click', () => {
+    rfmlPanel.classList.toggle('collapsed');
+  });
+
+  // ---- P4 初始化 ----
+  function initP4() {
+    console.log('📡 P4 RFML 就绪已加载');
+    console.log('✅ 功能: Taxonomy管理 · Split分配 · 切片预览 · Manifest导出 · 质量门禁');
+  }
+
+  /* ===================================================================
+     初始化
+     =================================================================== */
+
+  // 空状态占位图
+  const emptyLayout = {
+    title: { text: '等待数据…', font: { size: 13, color: '#b0b8c8' }, x: 0.5 },
+    margin: { l: 16, r: 16, t: 40, b: 16 },
+    paper_bgcolor: '#fafcff',
+    plot_bgcolor: '#fafcff',
+    xaxis: { visible: false },
+    yaxis: { visible: false },
+    annotations: [{
+      text: '请选择 .sigmf-meta 文件<br>加载 IQ 数据后自动显示',
+      showarrow: false,
+      font: { size: 12, color: '#b0b8c8' },
+      x: 0.5, y: 0.5,
+      xref: 'paper', yref: 'paper',
+    }],
+  };
+
+  // 初始化所有 Plotly 图表为空状态
+  [iqPlotDiv, constPlotDiv, psdPlotDiv, specPlotDiv].forEach(div => {
+    Plotly.react(div, [], emptyLayout);
+  });
+
+  // 初始化标签时间轴占位
+  annotTimeline.innerHTML = `
+    <div class="annot-placeholder">
+      📌 加载数据后，annotation 片段将在此处显示为彩色时间条
+    </div>
+  `;
+
+  // 初始化拖拽分割线
+  initResizer();
+
+  // 注册视图联动
+  registerPlotlyLinking();
+
+  console.log('📡 RFview P2+P3 已就绪');
+  console.log('✅ 功能: IQ时域 · 星座图 · PSD频谱 · 瀑布图 · 标签时间轴 · 视图联动 · 元数据编辑 · Capture管理 · Annotation CRUD · 保存/导出/撤销');
+  initP4();
+  initP5();
+
+  // 导出以便调试
+  window.__rfview = {
+    loadAndVisualize,
+    handleFileSelect,
+    handleDataFile,
+    decodeCF32,
+    welchPSD,
+    computeSpectrogram,
+    plotConstellation,
+    renderAnnotationTimeline,
+    // P3 exports
+    renderEditableMetaPanel,
+    markModified,
+    closeAnnotationEditor,
+    openAnnotationEditor,
+    createAnnotationFromSelection,
+    saveAnnotationEdit,
+    revertAllChanges,
+    saveAsOverlay,
+    saveFullMeta,
+    showDiffPreview,
+    deepClone,
+    escHtml,
+    // P4 exports
+    buildTaxonomy,
+    renderTaxonomy,
+    computeSplits,
+    renderSplits,
+    computeSlices,
+    renderSlices,
+    renderSliceOverlay,
+    generateManifestRows,
+    exportJSONL,
+    exportCSV,
+    runQualityGate,
+    updateP4Panels,
+    // P5 exports
+    loadRemoteSigMF,
+    applyBulkReview,
+    addCurrentAssetToBatch,
+    exportBatchManifest,
+    exportBatchReport,
+    comparePredictions,
+    exportPredictionCompare,
+    updateP5Panels,
+    p4Taxonomy,
+    p4Splits,
+    p4Slices,
+    p4GateResults,
+    p4GatePassed,
+    batchAssets,
+  };
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P5 扩展能力 — 终审验收报告</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 20px;
+    line-height: 1.6;
+  }
+  h1 { font-size: 22px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+  h2 { font-size: 17px; margin: 24px 0 10px; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-weight:600; font-size:13px; }
+  .badge.pass { background:#14532d; color:var(--green); }
+  .badge.fail { background:#7f1d1d; color:var(--red); }
+  .badge.warn { background:#713f12; color:var(--amber); }
+  .badge.info { background:#1e3a5f; color:#60a5fa; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  th { text-align:left; padding:8px 6px; border-bottom:2px solid var(--border); font-weight:600; }
+  td { padding:8px 6px; border-bottom:1px solid var(--border); }
+  .sev { display:inline-block; font-size:11px; font-weight:700; padding:1px 6px; border-radius:3px; }
+  .sev.p0 { background:#7f1d1d; color:var(--red); }
+  .sev.med { background:#713f12; color:var(--amber); }
+  .sev.low { background:#1e3a5f; color:#60a5fa; }
+  code { background:#0f172a; padding:1px 5px; border-radius:3px; font-size:13px; }
+  pre { background:#0f172a; padding:12px; border-radius:6px; overflow-x:auto; font-size:13px; border:1px solid var(--border); }
+  .section { background:var(--card); border-radius:8px; padding:16px; margin:16px 0; border:1px solid var(--border); }
+  .ok { color:var(--green); font-weight:600; }
+  .warn { color:var(--amber); }
+  .err { color:var(--red); }
+  .summary-row { display:flex; gap:16px; flex-wrap:wrap; }
+  .stat { flex:1; min-width:140px; background:var(--card); border-radius:8px; padding:14px; text-align:center; border:1px solid var(--border); }
+  .stat .num { font-size:28px; font-weight:700; }
+  .stat .label { font-size:12px; color:var(--text-muted); }
+  .footer { margin-top:32px; padding:12px; text-align:center; border-top:1px solid var(--border); color:var(--text-muted); font-size:13px; }
+</style>
+</head>
+<body>
+
+<h1>🧪 P5 扩展能力 · 终审验收报告</h1>
+<p style="color:var(--text-muted);margin:-4px 0 0 0;">
+  复审者：卧龙 &nbsp;|&nbsp; 日期：2026-06-01 &nbsp;|&nbsp; 基文件：<code>viewer.html</code> &nbsp;|&nbsp; 修复方：Linus (Codex CLI)
+</p>
+
+<div class="summary-row">
+  <div class="stat">
+    <div class="num" style="color:var(--green)">3 / 3</div>
+    <div class="label">MED 修复项</div>
+    <div style="font-size:12px;margin-top:4px;"><span class="ok">✅ 全部通过</span></div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--green)">0</div>
+    <div class="label">新增回归问题</div>
+    <div style="font-size:12px;margin-top:4px;"><span class="ok">✅ 无</span></div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:var(--green)">✅ CLEARED</div>
+    <div class="label">终审结论</div>
+    <div style="font-size:12px;margin-top:4px;">P5 已清零</div>
+  </div>
+</div>
+
+<!-- ===== MED #1 ===== -->
+<div class="section">
+  <h2>MED #1 — 远程 fetch 无超时</h2>
+  <table>
+    <tr><th style="width:100px;">维度</th><th>详情</th></tr>
+    <tr>
+      <td>严重性</td>
+      <td><span class="sev med">MED</span></td>
+    </tr>
+    <tr>
+      <td>问题描述</td>
+      <td><code>fetchJson()</code> 和 <code>fetchBinary()</code> 不设 timeout，若服务器挂起则界面卡死。</td>
+    </tr>
+    <tr>
+      <td>修复方案</td>
+      <td>为两个函数添加 <code>AbortSignal.timeout(30000)</code></td>
+    </tr>
+    <tr>
+      <td>代码定位</td>
+      <td>
+        <code>fetchJson</code>: L4257-4263<br>
+        <code>fetchBinary</code>: L4265-4271
+      </td>
+    </tr>
+    <tr>
+      <td>验收结果</td>
+      <td>
+        <span class="badge pass">✅ 通过</span>
+        <ul style="margin:4px 0 0;padding-left:20px;font-size:13px;">
+          <li><code>fetchJson</code> L4259: <code>const signal = AbortSignal.timeout(30000);</code></li>
+          <li><code>fetchBinary</code> L4267: <code>const signal = AbortSignal.timeout(30000);</code></li>
+          <li>两个函数均通过 <code>{ mode: 'cors', signal }</code> 传入 fetch</li>
+          <li>L4292: <code>Promise.all([fetchJson(metaUrl), fetchBinary(dataUrl)])</code> 双路均受超时保护</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td>备注</td>
+      <td><code>AbortSignal.timeout</code> 兼容 Chrome 103+, Firefox 100+, Safari 15.4+，对现代 Web 工具无兼容问题。</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== MED #2 ===== -->
+<div class="section">
+  <h2>MED #2 — 单条编辑不更新 reviewed_at</h2>
+  <table>
+    <tr><th style="width:100px;">维度</th><th>详情</th></tr>
+    <tr>
+      <td>严重性</td>
+      <td><span class="sev med">MED</span></td>
+    </tr>
+    <tr>
+      <td>问题描述</td>
+      <td><code>saveAnnotationEdit()</code> 保存了 review_status/reviewer/review_note，但未更新 <code>rfview:reviewed_at</code>。</td>
+    </tr>
+    <tr>
+      <td>修复方案</td>
+      <td>在 <code>saveAnnotationEdit</code> 中比较前后 reviewStatus，变化时写入 <code>rfview:reviewed_at</code></td>
+    </tr>
+    <tr>
+      <td>代码定位</td>
+      <td>L3053-3089（<code>saveAnnotationEdit</code> 完整函数）</td>
+    </tr>
+    <tr>
+      <td>验收结果</td>
+      <td>
+        <span class="badge pass">✅ 通过</span>
+        <ul style="margin:4px 0 0;padding-left:20px;font-size:13px;">
+          <li>L3069: <code>const prevReviewStatus = a['rfview:review_status'] || 'pending';</code> — 记录变更前状态</li>
+          <li>L3080: <code>if (reviewStatus !== prevReviewStatus) a['rfview:reviewed_at'] = new Date().toISOString();</code> — 仅状态变化时写入</li>
+          <li>语义正确：仅 review 状态变更才记录 "reviewed at" 时间，不污染无状态变更的普通编辑</li>
+          <li>批量复核（L4334）<code>ann['rfview:reviewed_at'] = new Date().toISOString();</code> 无变化，一直正确写入</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td>备注</td>
+      <td>实现比预期更精细：不是每次保存都写时间戳，而是只在 <strong>reviewStatus 真正变化</strong> 时才记录。优雅。</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== MED #3 ===== -->
+<div class="section">
+  <h2>MED #3 — 预测对比报告缺 confidence</h2>
+  <table>
+    <tr><th style="width:100px;">维度</th><th>详情</th></tr>
+    <tr>
+      <td>严重性</td>
+      <td><span class="sev med">MED</span></td>
+    </tr>
+    <tr>
+      <td>问题描述</td>
+      <td><code>comparePredictions()</code> 导出的 JSON 对比报告中不含 <code>rfview:confidence</code> 信息。</td>
+    </tr>
+    <tr>
+      <td>修复方案</td>
+      <td>在 <code>comparePredictions()</code> 的 rows 对象中加入 <code>prediction_confidence</code> 字段</td>
+    </tr>
+    <tr>
+      <td>代码定位</td>
+      <td>L4515-4533（rows.push 代码段）</td>
+    </tr>
+    <tr>
+      <td>验收结果</td>
+      <td>
+        <span class="badge pass">✅ 通过</span>
+        <ul style="margin:4px 0 0;padding-left:20px;font-size:13px;">
+          <li>L4527: <code>prediction_confidence: p['rfview:confidence'],</code> — 已添加至对比结果行</li>
+          <li>字段紧随 <code>prediction_label</code>，与 <code>matched_truth_index</code>/<code>truth_label</code>/<code>label_match</code>/<code>time_iou</code> 并列</li>
+          <li>当 annotation 无 confidence 字段时值为 <code>undefined</code>，JSON 序列化为 <code>null</code>，行为正确</li>
+        </ul>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== 回归检查 ===== -->
+<div class="section">
+  <h2>🔍 回归检查</h2>
+  <table>
+    <tr><th>检查项</th><th>状态</th><th>说明</th></tr>
+    <tr>
+      <td>AbortSignal 浏览器兼容</td>
+      <td><span class="badge info">注意</span></td>
+      <td><code>AbortSignal.timeout()</code> 需 Chrome 103+/Firefox 100+/Safari 15.4+，未使用 polyfill。对现代 Web 工具而言可接受。</td>
+    </tr>
+    <tr>
+      <td>fetch 异常路径</td>
+      <td><span class="badge pass">✅</span></td>
+      <td>已有 <code>if (!resp.ok) throw new Error(...)</code>，超时抛出 <code>DOMException</code>（AbortError），上游 try/catch 可捕捉。</td>
+    </tr>
+    <tr>
+      <td>reviewed_at 重复写入</td>
+      <td><span class="badge pass">✅</span></td>
+      <td>条件写入（仅状态变化时），不会污染普通编辑时间戳。</td>
+    </tr>
+    <tr>
+      <td>reviewed_at 格式</td>
+      <td><span class="badge pass">✅</span></td>
+      <td><code>new Date().toISOString()</code> 输出 ISO 8601，与现有数据一致。</td>
+    </tr>
+    <tr>
+      <td>prediction_confidence 缺失处理</td>
+      <td><span class="badge pass">✅</span></td>
+      <td>无 confidence 时值为 <code>undefined</code> → JSON <code>null</code>，不会 break 序列化。</td>
+    </tr>
+    <tr>
+      <td>comparePredictions 下游消费</td>
+      <td><span class="badge pass">✅</span></td>
+      <td>新字段仅添加到 rows 对象中，下游排序/渲染逻辑无需更改。</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ===== 最终结论 ===== -->
+<div class="section" style="border-left:4px solid var(--green);">
+  <h2 style="margin-top:0;">🏁 最终结论</h2>
+  <div style="display:flex;align-items:center;gap:12px;margin:8px 0;">
+    <span style="font-size:48px;">✅</span>
+    <div>
+      <div style="font-size:20px;font-weight:700;color:var(--green);">P5 · 全部清零 (ALL CLEARED)</div>
+      <div style="color:var(--text-muted);margin-top:4px;">
+        3/3 MED 修复项已确认正确实施，无新增回归问题。
+      </div>
+    </div>
+  </div>
+  <ul style="margin-top:12px;padding-left:20px;font-size:14px;">
+    <li><span class="ok">✅ MED #1</span> — fetch 超时：<code>fetchJson</code> + <code>fetchBinary</code> 各加 <code>AbortSignal.timeout(30000)</code></li>
+    <li><span class="ok">✅ MED #2</span> — reviewed_at：<code>saveAnnotationEdit</code> 在 reviewStatus 变化时写入时间戳</li>
+    <li><span class="ok">✅ MED #3</span> — 对比 confidence：<code>comparePredictions</code> 行中加入 <code>prediction_confidence</code></li>
+    <li><span class="ok">✅ 0 新增回归</span> — 所有检查项通过</li>
+  </ul>
+  <div style="margin-top:12px;padding:10px;background:#0f172a;border-radius:6px;text-align:center;border:1px solid var(--border);">
+    <strong style="font-size:16px;color:var(--green);">🚀 P5 扩展能力可以合并，Linus 的修复工作质量合格。</strong>
+  </div>
+</div>
+
+<div class="footer">
+  报告由卧龙自动生成 · /mnt/d/CodeLab/RFview/test/reports/p5_acceptance.html · 2026-06-01
+</div>
+
+</body>
+</html>

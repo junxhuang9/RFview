@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RFview · P4 RFML 就绪 · 验收测试报告</title>
+  <style>
+    /* --- 深色科技感主题（与前序报告一致） --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-body: #0b1120;
+      --bg-card: #131c31;
+      --bg-card-alt: #18233d;
+      --bg-header: #0f1729;
+      --border: #1e2d4a;
+      --border-light: #2a3d5e;
+      --text-muted: #6b8ba0;
+      --text: #c8d8e8;
+      --text-bright: #e8f0fa;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59,130,246,.20);
+      --green: #22c55e;
+      --green-bg: rgba(34,197,94,.10);
+      --red: #ef4444;
+      --red-bg: rgba(239,68,68,.10);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245,158,11,.10);
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --font-mono: 'SF Mono','Cascadia Code','JetBrains Mono','Consolas',monospace;
+    }
+
+    body {
+      font-family: -apple-system, 'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg-body);
+      padding: 32px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .report-header {
+      text-align: center;
+      padding: 32px 24px 28px;
+      background: linear-gradient(135deg, #0f1729 0%, #131c31 50%, #18233d 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .report-header::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .report-header h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-bright);
+      letter-spacing: -.5px;
+    }
+    .report-header h1 span { color: var(--accent); }
+    .report-header .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .report-header .meta-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .report-header .meta-row .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .tag-pass { background: var(--green-bg); color: var(--green); }
+    .tag-fail { background: var(--red-bg); color: var(--red); }
+    .tag-warn { background: var(--amber-bg); color: var(--amber); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .summary-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .summary-card .num {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+    .summary-card .num.pass { color: var(--green); }
+    .summary-card .num.fail { color: var(--red); }
+    .summary-card .num.warn { color: var(--amber); }
+    .summary-card .num.total { color: var(--accent); }
+    .summary-card .label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .summary-card.accent {
+      background: linear-gradient(135deg, rgba(59,130,246,.12), transparent);
+      border-color: var(--accent);
+    }
+
+    .verdict {
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .verdict.pass {
+      background: var(--green-bg);
+      border: 1px solid var(--green);
+      color: var(--green);
+    }
+    .verdict.conditional {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber);
+      color: var(--amber);
+    }
+    .verdict.fail {
+      background: var(--red-bg);
+      border: 1px solid var(--red);
+      color: var(--red);
+    }
+
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section h2 .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(30,45,74,.5);
+    }
+    .test-item:last-child { border-bottom: none; }
+
+    .test-item .icon {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .test-item .icon.pass { background: var(--green-bg); color: var(--green); }
+    .test-item .icon.fail { background: var(--red-bg); color: var(--red); }
+    .test-item .icon.warn { background: var(--amber-bg); color: var(--amber); }
+
+    .test-item .content { flex: 1; min-width: 0; }
+    .test-item .content .title {
+      font-weight: 700;
+      color: var(--text-bright);
+      font-size: 14px;
+    }
+    .test-item .content .title .sub {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .test-item .content .detail {
+      font-size: 13px;
+      color: var(--text);
+      margin-top: 3px;
+    }
+    .test-item .content .code {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: rgba(59,130,246,.08);
+      color: var(--cyan);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .test-item .content .issue {
+      margin-top: 5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .test-item .content .issue.risk {
+      background: var(--amber-bg);
+      border-left: 3px solid var(--amber);
+      color: var(--amber);
+    }
+    .test-item .content .issue.info {
+      background: rgba(59,130,246,.08);
+      border-left: 3px solid var(--accent);
+      color: var(--text-muted);
+    }
+    .test-item .content .issue.error {
+      background: var(--red-bg);
+      border-left: 3px solid var(--red);
+      color: var(--red);
+    }
+
+    .risk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .risk-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .risk-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(30,45,74,.4);
+      vertical-align: top;
+    }
+    .risk-table tr:last-child td { border-bottom: none; }
+    .risk-level {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .risk-high { background: var(--red-bg); color: var(--red); }
+    .risk-mid { background: var(--amber-bg); color: var(--amber); }
+    .risk-low { background: rgba(34,197,94,.10); color: var(--green); }
+
+    .suggest-list { list-style: none; padding: 0; }
+    .suggest-list li {
+      padding: 6px 0 6px 20px;
+      position: relative;
+      font-size: 13px;
+    }
+    .suggest-list li::before {
+      content: '💡';
+      position: absolute;
+      left: 0;
+    }
+
+    .score-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--border);
+      margin: 8px 0 4px;
+      overflow: hidden;
+    }
+    .score-bar .fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .5s;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: 12px;
+    }
+    .footer code { font-family: var(--font-mono); font-size: 11px; }
+
+    /* ---- 里程碑时间线 ---- */
+    .milestone-chain {
+      display: flex;
+      gap: 0;
+      margin: 16px 0;
+      padding: 0;
+      list-style: none;
+      justify-content: center;
+    }
+    .milestone-chain li {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      position: relative;
+    }
+    .milestone-chain li .dot {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      border: 3px solid;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      z-index: 1;
+      background: var(--bg-body);
+    }
+    .milestone-chain li .dot.p2 { border-color: var(--green); color: var(--green); }
+    .milestone-chain li .dot.p3 { border-color: var(--amber); color: var(--amber); }
+    .milestone-chain li .dot.p4 { border-color: var(--accent); color: var(--accent); }
+    .milestone-chain li .label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .milestone-chain li .bar {
+      position: absolute;
+      top: 9px; left: 50%; width: 100%;
+      height: 3px;
+      z-index: 0;
+    }
+    .milestone-chain li .bar.p2 { background: var(--green); }
+    .milestone-chain li .bar.p3 { background: var(--amber); }
+    .milestone-chain li:last-child .bar { display: none; }
+
+    @media (max-width: 700px) {
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .report-header .meta-row { flex-direction: column; gap: 6px; }
+      .milestone-chain { flex-direction: column; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header class="report-header">
+  <h1>RFview · <span>P4</span> RFML 就绪 验收测试报告</h1>
+  <p class="subtitle">Taxonomy 管理 · Split 分配 · 切片预览 · Manifest 导出 · 质量门禁 — 卧龙深度审查 · deepseek-v4-pro</p>
+  <div class="meta-row">
+    <span>📅 2026-06-01</span>
+    <span>📄 viewer.html (3750 行)</span>
+    <span>🔬 审查范围: P4 RFML 就绪功能 (行 609-885 CSS, 行 1019-1053 HTML, 行 2816-3659 JS)</span>
+    <span><span class="tag tag-pass">P4 RFML 就绪</span></span>
+  </div>
+</header>
+
+<!-- ============================================================
+     SUMMARY
+     ============================================================ -->
+<div class="summary-grid">
+  <div class="summary-card accent">
+    <div class="num total">20</div>
+    <div class="label">测试项总数</div>
+  </div>
+  <div class="summary-card">
+    <div class="num pass">18</div>
+    <div class="label">✅ 通过</div>
+  </div>
+  <div class="summary-card">
+    <div class="num warn">2</div>
+    <div class="label">⚠️ 需注意</div>
+  </div>
+  <div class="summary-card">
+    <div class="num fail">0</div>
+    <div class="label">❌ 未通过</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     VERDICT
+     ============================================================ -->
+<div class="verdict pass">
+  ✅ <strong>通过</strong> — 全部 P4 核心功能已实现，2 项需注意事项见下方，无阻塞性问题
+</div>
+
+<!-- ============================================================
+     里程碑总览
+     ============================================================ -->
+<div class="section">
+  <h2>📈 P2→P3→P4 里程碑总览</h2>
+  <ul class="milestone-chain">
+    <li>
+      <div class="dot p2">✓</div>
+      <div class="label">P2 MVP</div>
+      <div class="bar p2"></div>
+    </li>
+    <li>
+      <div class="dot p3">✓</div>
+      <div class="label">P3 标注与元数据</div>
+      <div class="bar p3"></div>
+    </li>
+    <li>
+      <div class="dot p4">✓</div>
+      <div class="label">P4 RFML 就绪</div>
+    </li>
+  </ul>
+  <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+    <strong>P2 (18/18 ✅)</strong> → IQ时域 / 星座图 / PSD频谱 / 瀑布图 / 标签时间轴 / 视图联动<br/>
+    <strong>P3 (14/18 ✅, 4 ⚠）</strong> → 元数据编辑 / Capture管理 / Annotation CRUD / 保存导出撤销<br/>
+    <strong>P4 (18/20 ✅, 2 ⚠）</strong> → Taxonomy管理 / Split分配 / 切片预览 / Manifest导出 / 质量门禁
+  </div>
+</div>
+
+<!-- ============================================================
+     验收标准对照
+     ============================================================ -->
+<div class="section">
+  <h2>📋 P4 验收标准对照</h2>
+
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">可把通过门禁的数据导出给训练流水线</div>
+      <div class="detail">
+        实现了完整的导出链路：<span class="code">generateManifestRows()</span> → <span class="code">exportJSONL()</span> / <span class="code">exportCSV()</span>，
+        导出前调用 <span class="code">runQualityGate()</span> 自动检查 4 项门禁（标签覆盖 ≥ 80%、类别均衡 ≤ 10x、
+        数据一致性、Split 无泄漏），未通过时禁止导出。输出格式包含 <span class="code">source_uri</span>、
+        <span class="code">sample_start</span>、<span class="code">sample_count</span>、<span class="code">label_id</span>、
+        <span class="code">label_name</span>、<span class="code">snr_db</span>、<span class="code">split</span> 七个标准字段。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     测试项详情
+     ============================================================ -->
+<div class="section">
+  <h2>🧪 测试项详情 <span class="badge tag-pass">18/20 ✅</span></h2>
+
+  <!-- 1. Taxonomy 自动提取 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Taxonomy 自动提取 <span class="sub">1.1 从 annotation 中提取类别</span></div>
+      <div class="detail">
+        <span class="code">buildTaxonomy()</span> 遍历 <span class="code">currentMeta.annotations</span>，
+        按 label 聚合 sample_count 统计，按样本数降序排列构建 <span class="code">p4Taxonomy</span> 列表。
+        每条包含 <span class="code">id</span>、<span class="code">name</span>、<span class="code">count</span>、
+        <span class="code">pct</span>、<span class="code">color</span> 字段。
+      </div>
+      <div class="issue info">
+        📌 使用 <span class="code">getAnnotLabel()</span> 支持 <span class="code">core:label</span> 和 <span class="code">label</span> 两种命名风格。
+        测试数据（3286 条 annotation，37 个唯一类别）可自动提取。
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 类别分布显示 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">类别分布显示 <span class="sub">1.2 占比条 + 百分比</span></div>
+      <div class="detail">
+        <span class="code">renderTaxonomy()</span> 渲染表格显示类别 ID、名称、样本数和占比条。
+        占比条使用 <span class="code">&lt;div class="taxonomy-bar"&gt;</span> 样式（<span class="code">width: item.pct%</span>），
+        百分比精确到 0.1%。类别数量显示在 <span class="code">taxonomyCount</span> 徽章中。
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 编辑类别 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">类别编辑 <span class="sub">1.3 编辑 ID 和名称</span></div>
+      <div class="detail">
+        Taxonomy 表格中每个类别的 ID 和名称字段都是 <span class="code">&lt;input&gt;</span> 可编辑输入框，
+        <span class="code">change</span> 事件通过 <span class="code">data-tax-idx</span> 和 <span class="code">data-tax-field</span>
+        属性直接修改 <span class="code">p4Taxonomy[idx][field]</span>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 内置 RadioML 类别 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">内置 RadioML 类别 <span class="sub">1.4 RADIOML2018_CLASSES 预设</span></div>
+      <div class="detail">
+        定义 <span class="code">RADIOML2018_CLASSES</span> 常量包含 11 个标准调制类别
+        （<span class="code">8PSK, AM-DSB, AM-SSB, BPSK, CPFSK, GFSK, PAM4, QAM16, QAM64, QPSK, WBFM</span>），
+        与设计文档一致。当标注数据为空但数据已加载时，自动填充预设类别作为占位。
+      </div>
+      <div class="issue info">
+        📌 标注中匹配 RadioML 类别时使用 <span class="code">includes</span> 模糊匹配（行 2901），
+        可能将包含子串的标签错误归类。示例："BPSK_variant" 也会匹配 "BPSK" 的 mod.bpsk ID。
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 添加/重置类别 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">添加/重置自定义类别 <span class="sub">1.5 添加/重置按钮</span></div>
+      <div class="detail">
+        "添加自定义类别"按钮新建 <span class="code">custom.{name}</span> ID 的类别；"重置"按钮调用
+        <span class="code">buildTaxonomy()</span> 重新从 annotations 构建。
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Split 分配 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Train/Val/Test 分配 <span class="sub">2.1 分层随机抽样</span></div>
+      <div class="detail">
+        <span class="code">computeSplits()</span> 按 label 分组后 Fisher-Yates shuffle，
+        再按配置比例（默认 70/15/15）分配 Train/Val/Test。每组至少 1 条 Train。
+        <span class="code">p4Splits</span> 保存索引数组。
+      </div>
+      <div class="issue risk">
+        ⚠️ 使用 <span class="code">Math.random()</span> 无种子，每次刷新或重新分配结果不同，
+        不可复现。建议增加种子随机数生成器以支持可复现的 Split 分配。
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Split 比例配置 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Split 比例配置 <span class="sub">2.2 数字输入 + 自动归一化</span></div>
+      <div class="detail">
+        <span class="code">renderSplits()</span> 显示三个数字输入框，支持 0-100 步进 5 的比例配置。
+        当 sum ≠ 100 时自动归一化（行 3113-3120），舍入误差分配给 Test 并确保 ≥ 0。
+      </div>
+      <div class="issue info">
+        📌 归一化逻辑将全部舍入误差放入 Test，可能导致 Test 比例与预期略有偏差（例如 50/25/25 → 50/25/25 不变，33/33/33 → 33/33/34）。
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 类别分布表 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Split 类别分布展示 <span class="sub">2.3 按 split 统计类别</span></div>
+      <div class="detail">
+        Split 面板底部显示类别分布表（Train/Val/Test 三列），展示每个类别在各 split 中的数量。
+        支持"重新分配"按钮一键重分配。
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. 切片配置 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">切片窗口/步长配置 <span class="sub">3.1 窗口长度和步长输入</span></div>
+      <div class="detail">
+        切片预览面板包含 <span class="code">sliceWinInput</span>（窗口长度，默认 1024，范围 64-65536）和
+        <span class="code">sliceStepInput</span>（步长，默认 512，范围 1-65536）两个数字输入框。
+        值改变时自动重新计算切片。
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. annotation 边界切片 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Annotation 边界切片 <span class="sub">3.2 窗口内 annotation 切分</span></div>
+      <div class="detail">
+        <span class="code">computeSlices()</span> 找出与当前视口窗口有交集的 annotation，
+        以 <span class="code">p4SliceWin</span> 长度为窗口、<span class="code">p4SliceStep</span> 为步长进行切片。
+        最小 slice 长度为 64 样本，生成 <span class="code">start/end/count/label/labelId</span> 字段。
+      </div>
+    </div>
+  </div>
+
+  <!-- 11. 瀑布图叠加 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">瀑布图叠加 <span class="sub">3.3 切片矩形叠加显示</span></div>
+      <div class="detail">
+        <span class="code">renderSliceOverlay()</span> 在瀑布图（<span class="code">specPlotDiv</span>）上通过
+        Plotly <span class="code">relayout({ shapes })</span> 叠加半透明矩形，最多显示 50 个切片。
+        颜色根据 label 从 <span class="code">TAXONOMY_COLORS</span> 调色板分配。
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. Manifest 字段 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Manifest 字段完整性 <span class="sub">4.1 7 个标准字段</span></div>
+      <div class="detail">
+        <span class="code">generateManifestRows()</span> 为每个 annotation 生成包含 7 个字段的 manifest 行：
+        <span class="code">source_uri</span>（<span class="code">file:///{dataFileName}#sample_{start}</span>）、
+        <span class="code">sample_start</span>、<span class="code">sample_count</span>、
+        <span class="code">label_id</span>（来自 taxonomy 映射）、<span class="code">label_name</span>、
+        <span class="code">snr_db</span>（从 annotation 或 global 读取）、<span class="code">split</span>（来自 split 分配）。
+      </div>
+      <div class="issue info">
+        📌 字段与设计文档（<span class="code">hdf5-radioml.html</span>）中的 manifest 示例相比，
+        缺少 <span class="code">asset_id</span>、<span class="code">format</span>、<span class="code">sample_dtype</span> 字段。
+        当前实现使用简化 schema，对下游训练管道仍可正常使用。建议后续版本补充完整字段。
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. JSONL 导出 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">JSONL 格式导出 <span class="sub">4.2 每行一个 JSON 对象</span></div>
+      <div class="detail">
+        <span class="code">exportJSONL()</span> 使用 <span class="code">JSON.stringify(r)</span> 序列化每行，
+        <span class="code">\\n</span> 连接，Blob 下载。文件名格式 <span class="code">{basename}_rfml_manifest.jsonl</span>。
+        导出前调用 <span class="code">runQualityGate()</span>，门禁未通过时阻止导出。
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. CSV 导出 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">CSV 格式导出 <span class="sub">4.3 含 BOM + 正确引号</span></div>
+      <div class="detail">
+        <span class="code">exportCSV()</span> 生成 UTF-8 BOM（<span class="code">\\uFEFF</span>）CSV，
+        <span class="code">label_name</span> 使用双引号包裹并转义内部引号（<span class="code">""</span>）。
+        其余字段直接拼接。导出前同样运行门禁检查。
+      </div>
+      <div class="issue risk">
+        ⚠️ CSV 中 <span class="code">source_uri</span> 字段未用引号包裹，若文件名包含逗号或换行符会导致 CSV 解析错误。
+        建议所有字段都使用双引号包裹或对 <span class="code">source_uri</span> 单独加引。
+      </div>
+    </div>
+  </div>
+
+  <!-- 15. 质量门禁：标签覆盖 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">门禁-标签覆盖 <span class="sub">5.1 ≥ 80% 阈值</span></div>
+      <div class="detail">
+        <span class="code">runQualityGate()</span> 统计所有 annotation 的 sample_count 之和，
+        与总样本数比较。≥ 80% 为 <span class="code">pass</span>，50-80% 为 <span class="code">warn</span>，≤ 50% 为 <span class="code">fail</span>。
+      </div>
+      <div class="issue info">
+        📌 测试数据（trimmedSamples）中 22372352 总样本，3286 条 annotation 的总样本覆盖可能不足 80%，
+        实际测试时可能触发 warn/fail。这是数据集特性而非代码问题。
+      </div>
+    </div>
+  </div>
+
+  <!-- 16. 质量门禁：类别均衡 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">门禁-类别均衡 <span class="sub">5.2 最大/最小比 ≤ 10x</span></div>
+      <div class="detail">
+        按 label 聚合 sample_count，计算最大/最小类别比值。≤ 10 为 pass，10-20 为 warn，> 20 为 fail。
+        仅一个类别时自动通过。
+      </div>
+    </div>
+  </div>
+
+  <!-- 17. 质量门禁：数据一致性 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">门禁-数据一致性 <span class="sub">5.3 meta/data 匹配校验</span></div>
+      <div class="detail">
+        检查 <span class="code">global['core:sample_count']</span> 或
+        <span class="code">traceability:sample_length</span> 与实际数据大小是否一致。
+        不一致时标记 <span class="code">warn</span>，缺失声明时跳过检查并标记 <span class="code">warn</span>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 18. 质量门禁：Split 无泄漏 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">门禁-Split 无泄漏 <span class="sub">5.4 索引重复检测</span></div>
+      <div class="detail">
+        将 Train/Val/Test 的索引合并后检查是否有重复（通过 <span class="code">Set</span> 大小与原始数组长度比较）。
+        有重复时标记 <span class="code">warn</span>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 19. 门禁阻止导出 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">门禁阻止导出 <span class="sub">5.5 fail 时按钮 disabled</span></div>
+      <div class="detail">
+        <span class="code">p4GatePassed</span> 综合判定：只要任一检查的 <span class="code">fail</span> 为 true 则阻塞。
+        Manifest 面板的导出按钮在门禁未通过时显示 <span class="code">disabled style="opacity:0.5;cursor:not-allowed"</span>，
+        导出函数内也进行二次检查。
+      </div>
+      <div class="issue info">
+        📌 综合判定逻辑（行 3532）仅检查 <span class="code">fail</span>，不阻塞 <span class="code">warn</span> 状态。
+        这意味着标签覆盖 60%（warn）时仍可导出，符合设计意图。
+      </div>
+    </div>
+  </div>
+
+  <!-- 20. XSS 安全性 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">XSS 安全性审查 <span class="sub">6.1 P4 代码 innerHTML 使用</span></div>
+      <div class="detail">
+        P4 代码中所有 <span class="code">innerHTML</span> 赋值均使用 <span class="code">escHtml()</span> 对用户输入进行转义。
+        共 20 处 <span class="code">escHtml()</span> 调用，覆盖 Taxonomy（label/id/name）、Split（label）、
+        切片（label）、Manifest 预览（JSON 字符串）、门禁详情（detail）等所有渲染点。
+      </div>
+      <div class="issue info">
+        📌 <strong>相比 P3 报告中的 XSS 风险，P4 代码已全部使用 escHtml 保护，无新增 XSS 问题。</strong>
+        <span class="code">escHtml()</span> 函数正确处理了 5 个关键字符（&amp; &lt; &gt; &quot; &#39;）。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     发现的问题
+     ============================================================ -->
+<div class="section">
+  <h2>🔍 发现的问题与风险</h2>
+  <table class="risk-table">
+    <thead>
+      <tr>
+        <th style="width:80px">等级</th>
+        <th style="width:120px">位置</th>
+        <th>描述</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="risk-level risk-mid">⚠️ 中</span></td>
+        <td><span class="code">renderSplits()</span><br/>行 3073-3075</td>
+        <td>
+          <strong>Split 比例输入无即时校验</strong> — 用户可输入总和超过 100 的值，需触发 change 事件后才归一化。
+          归一化将舍入误差全部放进 Test，若 Train/Val/Test 值较小（如 2/2/2）可能导致 Test 出现 0。
+          建议增加输入时实时校验提示。
+        </td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-mid">⚠️ 中</span></td>
+        <td><span class="code">exportCSV()</span><br/>行 3382-3391</td>
+        <td>
+          <strong>CSV 字段引号不完整</strong> — 仅 <span class="code">label_name</span> 字段使用双引号包裹。
+          <span class="code">source_uri</span> 包含文件路径，文件名中可能出现逗号或换行符，导致 CSV 列错位。
+          建议所有字段统一使用标准 CSV 格式（全部加引或使用 CSV 库）。
+        </td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">🔧 低</span></td>
+        <td><span class="code">buildTaxonomy()</span><br/>行 2900-2902</td>
+        <td>
+          <strong>RadioML 类别模糊匹配</strong> — 使用 <span class="code">includes</span> 检测 RadioML 标准类别，
+          例如 "BPSK_v2" 会误匹配 "BPSK" 的 <span class="code">mod.bpsk</span> ID。建议改为精确匹配。
+        </td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">🔧 低</span></td>
+        <td><span class="code">computeSplits()</span><br/>行 3022-3025</td>
+        <td>
+          <strong>Split 分配不可复现</strong> — 使用 <span class="code">Math.random()</span> 无种子化，
+          导致每次重新分配产生不同结果，不利于机器学习实验的复现。建议引入种子随机数生成器。
+        </td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">🔧 低</span></td>
+        <td><span class="code">generateManifestRows()</span><br/>行 3321-3329</td>
+        <td>
+          <strong>Manifest 字段不完整</strong> — 与设计文档的 manifest 示例相比，缺少
+          <span class="code">asset_id</span>、<span class="code">format</span>、<span class="code">sample_dtype</span>
+          字段。建议后续补充以兼容更广泛的训练管道。
+        </td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">🔧 低</span></td>
+        <td><span class="code">renderSliceOverlay()</span><br/>行 3264</td>
+        <td>
+          <strong>切片颜色 O(n²) 计算</strong> — 每次为切片分配颜色时重新构建 <span class="code">Set</span>，
+          但最多只显示 50 个切片，性能影响可忽略。
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     代码质量评分
+     ============================================================ -->
+<div class="section">
+  <h2>📊 代码质量评分</h2>
+
+  <div style="margin-bottom:12px;font-size:13px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span>结构清晰度</span><span style="color:var(--green)">8.5/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:85%;background:var(--green)"></div></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+      IIFE 封装、'use strict'、分模块注释块。P4 代码在独立区域（行 2816-3659）不与 P2/P3 混杂。
+      函数职责单一，命名直观。
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span>安全性</span><span style="color:var(--green)">9/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:90%;background:var(--green)"></div></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+      所有 innerHTML 使用 escHtml() 转义，无 innerHTML 操作未受保护。
+      CSV 引号不完整是唯一安全问题（低风险）。
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span>功能完整性</span><span style="color:var(--green)">9/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:90%;background:var(--green)"></div></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+      P4 全部 5 个功能模块完整实现，覆盖所有验收标准。仅 Manifest 字段不如设计文档完整。
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span>集成与连贯性</span><span style="color:var(--green)">9/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:90%;background:var(--green)"></div></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+      P4 通过 <span class="code">_origP4HandleFileSelect</span> / <span class="code">_origP4LoadAndVisualize</span>
+      模式优雅地与 P2/P3 集成，数据加载后自动通过 <span class="code">updateP4Panels()</span> 更新所有面板。
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span>错误处理与边界</span><span style="color:var(--amber)">7/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:70%;background:var(--amber)"></div></div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+      多数函数有边界检查（空 annotations、无数据等），但 Split 归一化可能产生 Test=0，
+      Taxonomy build 中无 label 时的回退逻辑可能覆盖实际数据。建议增加更多边界测试。
+    </div>
+
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span><strong>综合评分</strong></span><span style="color:var(--accent);font-weight:700">8.5/10</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:85%;background:var(--accent)"></div></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     改进建议
+     ============================================================ -->
+<div class="section">
+  <h2>💡 改进建议</h2>
+  <ul class="suggest-list">
+    <li><strong>CSV 导出全面引号化</strong> — 对所有字段使用标准 CSV 格式（全部双引号包裹），或使用 <span class="code">PapaParse</span> 等库生成稳健 CSV，防止文件名中的特殊字符破坏列结构。</li>
+    <li><strong>可复现 Split</strong> — 引入种子随机数生成器（如 <span class="code">seedrandom.js</span>），允许用户在 UI 中输入随机种子以复现 Split 分配结果。</li>
+    <li><strong>Split 比例实时校验</strong> — 在 <span class="code">&lt;input&gt;</span> 上绑定 <span class="code">input</span> 事件以实时显示比例总和提示，而非等到 <span class="code">change</span> 才归一化。</li>
+    <li><strong>Manifest 字段补充</strong> — 添加 <span class="code">asset_id</span>（默认值 <span class="code">"sigmf." + metaFileName</span>）、<span class="code">format</span>（<span class="code">sigmf.annotation</span>）、<span class="code">sample_dtype</span>（<span class="code">cf32</span>）字段以对齐设计文档。</li>
+    <li><strong>HDF5 适配器</strong> — 当前 viewer.html 不含 HDF5 导入功能，RadioML2018 类别仅为静态预设。建议后续 P5 版本实现 HDF5 数据适配器以导入真实 RadioML2018 数据集。</li>
+    <li><strong>Taxonomy 精确匹配</strong> — 将 <span class="code">includes</span> 改为精确相等匹配或配置化匹配策略，避免误将自定义标签映射为标准调制 ID。</li>
+    <li><strong>瀑布图叠加性能</strong> — 当前最多显示 50 个切片矩形，对于高频标注场景（>1000 slices）可能需要限制更严或增量更新。</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     代码统计
+     ============================================================ -->
+<div class="section">
+  <h2>📐 代码规模统计</h2>
+  <table class="risk-table">
+    <thead>
+      <tr><th>类别</th><th>行数范围</th><th>行数</th><th>占比</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>P4 CSS 样式</td><td>609-885</td><td>277</td><td>7.4%</td></tr>
+      <tr><td>P4 HTML 面板</td><td>1019-1053</td><td>35</td><td>0.9%</td></tr>
+      <tr><td>P4 JavaScript 逻辑</td><td>2816-3659</td><td>844</td><td>22.5%</td></tr>
+      <tr><td>P4 总计</td><td>—</td><td>1,156</td><td>30.8%</td></tr>
+      <tr><td>整个 viewer.html</td><td>1-3750</td><td>3,750</td><td>100%</td></tr>
+    </tbody>
+  </table>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:8px">
+    P4 新增代码约占 viewer.html 的 31%，其余为 P2（约 45%）和 P3（约 24%）功能。
+    P4 完整实现了全部 5 个功能模块，无存根或 Todo。
+  </div>
+</div>
+
+<!-- ============================================================
+     P3 遗留问题复查
+     ============================================================ -->
+<div class="section">
+  <h2>🔄 P3 遗留问题复查</h2>
+  <table class="risk-table">
+    <thead>
+      <tr><th style="width:180px">P3 问题</th><th>P4 中是否复现</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>风险字段警告仅显示一次</td>
+        <td><span class="risk-level risk-low">✅ 未复现</span></td>
+        <td>P4 代码未涉及 P3 的 datatype/sample_rate 警告逻辑，不相关。</td>
+      </tr>
+      <tr>
+        <td>KV 删除依赖 window.__rfview</td>
+        <td><span class="risk-level risk-low">✅ 未复现</span></td>
+        <td>P4 使用 <span class="code">addEventListener</span> 绑定事件，避免内联 onclick 模式。</td>
+      </tr>
+      <tr>
+        <td>XSS 安全风险</td>
+        <td><span class="risk-level risk-low">✅ 已修复</span></td>
+        <td>P4 所有 innerHTML 使用 <span class="code">escHtml()</span> 保护。P3 报告的 XSS 模式在 P4 中不再出现。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<div class="footer">
+  RFview · P4 RFML 就绪 验收测试报告 &mdash; 生成于 2026-06-01 &mdash; 评审工具: 卧龙 (deepseek-v4-pro)<br/>
+  项目路径: <code>/mnt/d/CodeLab/RFview/</code> · 测试数据: <code>Data/trimmedSamples.sigmf-meta</code> (3286 annotations)<br/>
+  前序报告: <code>test/reports/p2_acceptance.html</code> · <code>test/reports/p3_acceptance.html</code>
+</div>
+
+</body>
+</html>

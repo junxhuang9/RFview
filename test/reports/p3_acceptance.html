@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RFview · P3 标注与元数据 · 验收测试报告</title>
+  <style>
+    /* --- 深色科技感主题（与 p2_acceptance.html 一致） --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-body: #0b1120;
+      --bg-card: #131c31;
+      --bg-card-alt: #18233d;
+      --bg-header: #0f1729;
+      --border: #1e2d4a;
+      --border-light: #2a3d5e;
+      --text-muted: #6b8ba0;
+      --text: #c8d8e8;
+      --text-bright: #e8f0fa;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59,130,246,.20);
+      --green: #22c55e;
+      --green-bg: rgba(34,197,94,.10);
+      --red: #ef4444;
+      --red-bg: rgba(239,68,68,.10);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245,158,11,.10);
+      --purple: #a855f7;
+      --cyan: #06b6d4;
+      --font-mono: 'SF Mono','Cascadia Code','JetBrains Mono','Consolas',monospace;
+    }
+
+    body {
+      font-family: -apple-system, 'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg-body);
+      padding: 32px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .report-header {
+      text-align: center;
+      padding: 32px 24px 28px;
+      background: linear-gradient(135deg, #0f1729 0%, #131c31 50%, #18233d 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .report-header::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .report-header h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-bright);
+      letter-spacing: -.5px;
+    }
+    .report-header h1 span { color: var(--accent); }
+    .report-header .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .report-header .meta-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .report-header .meta-row .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .tag-pass { background: var(--green-bg); color: var(--green); }
+    .tag-fail { background: var(--red-bg); color: var(--red); }
+    .tag-warn { background: var(--amber-bg); color: var(--amber); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .summary-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .summary-card .num {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+    }
+    .summary-card .num.pass { color: var(--green); }
+    .summary-card .num.fail { color: var(--red); }
+    .summary-card .num.warn { color: var(--amber); }
+    .summary-card .num.total { color: var(--accent); }
+    .summary-card .label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .summary-card.accent {
+      background: linear-gradient(135deg, rgba(59,130,246,.12), transparent);
+      border-color: var(--accent);
+    }
+
+    .verdict {
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 28px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .verdict.pass {
+      background: var(--green-bg);
+      border: 1px solid var(--green);
+      color: var(--green);
+    }
+    .verdict.conditional {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber);
+      color: var(--amber);
+    }
+    .verdict.fail {
+      background: var(--red-bg);
+      border: 1px solid var(--red);
+      color: var(--red);
+    }
+
+    .section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section h2 .badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(30,45,74,.5);
+    }
+    .test-item:last-child { border-bottom: none; }
+
+    .test-item .icon {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .test-item .icon.pass { background: var(--green-bg); color: var(--green); }
+    .test-item .icon.fail { background: var(--red-bg); color: var(--red); }
+    .test-item .icon.warn { background: var(--amber-bg); color: var(--amber); }
+
+    .test-item .content { flex: 1; min-width: 0; }
+    .test-item .content .title {
+      font-weight: 700;
+      color: var(--text-bright);
+      font-size: 14px;
+    }
+    .test-item .content .title .sub {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-left: 6px;
+    }
+    .test-item .content .detail {
+      font-size: 13px;
+      color: var(--text);
+      margin-top: 3px;
+    }
+    .test-item .content .code {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: rgba(59,130,246,.08);
+      color: var(--cyan);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .test-item .content .issue {
+      margin-top: 5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .test-item .content .issue.risk {
+      background: var(--amber-bg);
+      border-left: 3px solid var(--amber);
+      color: var(--amber);
+    }
+    .test-item .content .issue.info {
+      background: rgba(59,130,246,.08);
+      border-left: 3px solid var(--accent);
+      color: var(--text-muted);
+    }
+    .test-item .content .issue.error {
+      background: var(--red-bg);
+      border-left: 3px solid var(--red);
+      color: var(--red);
+    }
+
+    .risk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .risk-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .risk-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(30,45,74,.4);
+      vertical-align: top;
+    }
+    .risk-table tr:last-child td { border-bottom: none; }
+    .risk-level {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .risk-high { background: var(--red-bg); color: var(--red); }
+    .risk-mid { background: var(--amber-bg); color: var(--amber); }
+    .risk-low { background: rgba(34,197,94,.10); color: var(--green); }
+
+    .suggest-list { list-style: none; padding: 0; }
+    .suggest-list li {
+      padding: 6px 0 6px 20px;
+      position: relative;
+      font-size: 13px;
+    }
+    .suggest-list li::before {
+      content: '💡';
+      position: absolute;
+      left: 0;
+    }
+
+    .score-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--border);
+      margin: 8px 0 4px;
+      overflow: hidden;
+    }
+    .score-bar .fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width .5s;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: 12px;
+    }
+    .footer code { font-family: var(--font-mono); font-size: 11px; }
+
+    @media (max-width: 700px) {
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .report-header .meta-row { flex-direction: column; gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header class="report-header">
+  <h1>RFview · <span>P3</span> 标注与元数据 验收测试报告</h1>
+  <p class="subtitle">元数据编辑 · Capture 管理 · Annotation CRUD · 保存/导出/撤销 — 卧龙深度审查 · deepseek-v4-pro</p>
+  <div class="meta-row">
+    <span>📅 2026-06-01</span>
+    <span>📄 viewer.html (2572 行)</span>
+    <span>🔬 审查范围: P3 标注与元数据功能 (行 462-2567)</span>
+    <span><span class="tag tag-pass">P3 标注与元数据</span></span>
+  </div>
+</header>
+
+<!-- ============================================================
+     SUMMARY
+     ============================================================ -->
+<div class="summary-grid">
+  <div class="summary-card accent">
+    <div class="num total">18</div>
+    <div class="label">测试项总数</div>
+  </div>
+  <div class="summary-card">
+    <div class="num pass">14</div>
+    <div class="label">✅ 通过</div>
+  </div>
+  <div class="summary-card">
+    <div class="num warn">4</div>
+    <div class="label">⚠️ 需注意</div>
+  </div>
+  <div class="summary-card">
+    <div class="num fail">0</div>
+    <div class="label">❌ 未通过</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     VERDICT
+     ============================================================ -->
+<div class="verdict conditional">
+  ✅ <strong>有条件通过</strong> — 全部 P3 核心功能已实现，4 项需注意事项见下方（含 1 个 XSS 安全风险）
+</div>
+
+<!-- ============================================================
+     验收标准对照
+     ============================================================ -->
+<div class="section">
+  <h2>📋 P3 验收标准对照</h2>
+
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">可完成手工打标签</div>
+      <div class="detail">
+        从当前选区新建 annotation（<span class="code">createAnnotationFromSelection</span>）、
+        编辑已有 annotation 的标签/边界/备注（<span class="code">openAnnotationEditor</span>）、
+        删除 annotation（确认对话框），支持频率上下限和备注字段。
+      </div>
+    </div>
+  </div>
+
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">保存为 SigMF 兼容 meta 或 overlay</div>
+      <div class="detail">
+        支持下载完整 <span class="code">.sigmf-meta</span> 文件，支持导出
+        <span class="code">.overlay.json</span>（仅含 global/captures/annotations），
+        保存前可预览 JSON diff，支持撤销全部修改。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     测试项详情
+     ============================================================ -->
+<div class="section">
+  <h2>🧪 测试项详情 <span class="badge tag-pass">14/18 ✅</span></h2>
+
+  <!-- 1. Global 字段编辑 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Global 字段表单编辑 <span class="sub">1.1 数据类型/采样率等</span></div>
+      <div class="detail">
+        数据类型使用 <span class="code">&lt;select&gt;</span> 下拉框（8 种 SigMF 类型），
+        采样率为数字输入，描述/作者/硬件/许可证为文本输入。
+        表单值通过 <span class="code">collectFormToMeta()</span> 同步到 <span class="code">currentMeta</span>。
+      </div>
+      <div class="issue info">
+        📌 字段完整，包含中心频率、通道数、版本、声明/实际样本数的只读展示。
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 高风险字段提示 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">高风险字段变更提示 <span class="sub">1.2 datatype/sample_rate 警告</span></div>
+      <div class="detail">
+        修改 datatype 时显示"变更数据类型会影响所有下游分析"警告（<span class="code">#dtWarn</span>），
+        修改 sample_rate 时显示"变更采样率会影响频率轴和时域标尺"警告（<span class="code">#srWarn</span>）。
+      </div>
+      <div class="issue risk">
+        ⚠️ 警告仅首次显示，用户 dismiss 后无法重新显示。建议增加关闭按钮而非永久显示。
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 自定义字段增删 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">自定义 KV 字段增删 <span class="sub">1.3 添加/删除自定义字段</span></div>
+      <div class="detail">
+        "添加自定义字段"按钮动态创建 key-value 输入行，每条有删除按钮。
+        <span class="code">collectFormToMeta()</span> 清除旧自定义字段后从表单重建。
+      </div>
+      <div class="issue risk">
+        ⚠️ KV 删除按钮使用 <span class="code">onclick="this.parentElement.remove();__rfview.markModified()"</span>
+        内联引用 <span class="code">window.__rfview</span>，依赖 IIFE 导出结构（行 2545-2567），
+        如果导出命名变更会导致功能失效。建议改用事件委托。
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Capture 编辑 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Capture 段编辑 <span class="sub">2.1 编辑 sample_start/frequency/datetime</span></div>
+      <div class="detail">
+        表格形式展示所有 capture 段，<span class="code">sample_start</span>、
+        <span class="code">frequency</span>、<span class="code">datetime</span> 均可编辑。
+        输入触发 <span class="code">markModified()</span> 和 <span class="code">validateCaptureMonotonic()</span>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Capture 新增 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Capture 段新增 <span class="sub">2.2 添加新的 capture 段</span></div>
+      <div class="detail">
+        "添加 Capture 段"按钮自动追加一条，<span class="code">sample_start</span> 默认为
+        最后一条 + 1000，频率 1 GHz，自动生成 ISO datetime。
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Capture 删除 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Capture 段删除 <span class="sub">2.3 删除 capture 段</span></div>
+      <div class="detail">
+        每行有删除按钮，点击后弹出确认对话框，确认后从数组移除并重新渲染。
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 单调性校验 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Capture 单调性校验 <span class="sub">2.4 sample_start 递增校验</span></div>
+      <div class="detail">
+        <span class="code">validateCaptureMonotonic()</span> 实时校验每行的
+        <span class="code">sample_start</span> 是否严格递增。不满足时输入框高亮红色
+        （<span class="code">.danger</span> 类），错误信息显示在表格下方。
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Annotation 编辑 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Annotation 编辑 <span class="sub">3.1 编辑标签/边界/备注</span></div>
+      <div class="detail">
+        点击 ✏️ 按钮弹出浮动编辑框，可编辑：标签、起始样本、样本数、频率下限、
+        频率上限、备注。保存后更新 <span class="code">core:*</span> 命名空间字段，
+        刷新时间轴和面板。
+      </div>
+      <div class="issue info">
+        📌 编辑框定位基于表行位置，如果行在视口之外可能定位异常，但有居中降级方案。
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. Annotation 删除 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Annotation 删除 <span class="sub">3.2 删除 annotation</span></div>
+      <div class="detail">
+        支持从列表行删除（✕ 按钮）和从编辑器浮窗内删除，均有确认对话框。
+        删除后自动刷新面板和标签时间轴。
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. Annotation 新增 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Annotation 新增 <span class="sub">3.3 从当前选区新建</span></div>
+      <div class="detail">
+        "从当前选区新建标注"按钮基于当前查看的采样范围和窗口大小创建新 annotation，
+        自动填入起始样本和样本数，然后弹出编辑器供完善标签/频率等信息。
+      </div>
+    </div>
+  </div>
+
+  <!-- 11. 表单验证 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Annotation 表单验证 <span class="sub">3.4 输入校验</span></div>
+      <div class="detail">
+        <span class="code">validateAnnotationForm()</span> 检查：起始样本 ≥ 0、
+        样本数 ≥ 1、不超出数据边界。错误信息实时显示在弹出框底部，
+        表单无效时阻止保存。
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. 下载 meta -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">下载 .sigmf-meta <span class="sub">4.1 保存完整 meta</span></div>
+      <div class="detail">
+        <span class="code">saveFullMeta()</span> 收集所有表单值，生成格式化的 JSON 文件
+        并通过 Blob 下载。保存后清除修改标记。
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. 导出 overlay -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">导出 overlay <span class="sub">4.2 导出独立 overlay JSON</span></div>
+      <div class="detail">
+        <span class="code">saveAsOverlay()</span> 构建包含 <span class="code">global</span>、
+        <span class="code">captures</span>、<span class="code">annotations</span> 的 overlay 对象，
+        下载为 <span class="code">.overlay.json</span>，不修改原始文件。
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. Diff 预览 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">Diff 预览 <span class="sub">4.3 修改前后对比</span></div>
+      <div class="detail">
+        <span class="code">computeDiff()</span> 对原始备份和当前修改后的 JSON 逐行比较，
+        深色终端风格显示：绿色(+)新增、红色(-)删除、灰色(=)未变。
+        通过模态对话框展示，支持点击外部关闭。
+      </div>
+    </div>
+  </div>
+
+  <!-- 15. 撤销修改 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">撤销修改 <span class="sub">4.4 恢复原始值</span></div>
+      <div class="detail">
+        <span class="code">revertAllChanges()</span> 从 <span class="code">originalMeta</span>
+        深拷贝恢复数据，清除修改状态，重新渲染面板和所有图表。
+        有确认对话框防止误操作。
+      </div>
+    </div>
+  </div>
+
+  <!-- 16. UI 布局 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">编辑界面布局 <span class="sub">5.1 侧边栏表单/浮窗/模态框</span></div>
+      <div class="detail">
+        P3 编辑器嵌入左侧元数据面板，Global 字段表格、Capture 表格和 Annotation
+        列表分区清晰。编辑浮窗定位在目标行旁，模态确认框居中。
+        所有样式与 P2 设计系统一致（CSS 变量、圆角、阴影）。
+      </div>
+    </div>
+  </div>
+
+  <!-- 17. 确认/取消按钮 -->
+  <div class="test-item">
+    <div class="icon pass">✅</div>
+    <div class="content">
+      <div class="title">确认/取消按钮 <span class="sub">5.2 防误操作设计</span></div>
+      <div class="detail">
+        所有破坏性操作（删除 capture、删除 annotation、撤销全部修改）均弹出
+        确认对话框。Annotation 编辑器提供保存/删除/取消三个独立按钮。
+        模态框支持点击外部关闭。
+      </div>
+    </div>
+  </div>
+
+  <!-- 18. XSS 安全 -->
+  <div class="test-item">
+    <div class="icon warn">⚠️</div>
+    <div class="content">
+      <div class="title">XSS 安全审查 <span class="sub">escHtml 使用完整性</span></div>
+      <div class="detail">
+        <span class="code">escHtml()</span> 函数已实现在行 2060-2063，用于防止 HTML 注入。
+        但 <strong>仅在行 1978（描述字段）调用了 escHtml()</strong>，
+        而行 1979-1981 的 <span class="code">author</span>、
+        <span class="code">hw</span>、<span class="code">license</span> 字段
+        <strong>未使用 escHtml</strong>。
+      </div>
+      <div class="issue error">
+        🔴 <strong>XSS 风险（中危）</strong>：虽然这些字段通常由技术用户编辑，
+        且行 1978-1981 的值被包裹在 <span class="code">value="${...}"</span> 属性中，
+        但属性值未转义引号。如果作者/硬件/许可证字段包含
+        <span class="code">"</span> 或 <span class="code">&gt;</span>，
+        可能导致 HTML 注入。建议统一使用 <span class="code">escHtml()</span>。
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     发现的问题
+     ============================================================ -->
+<div class="section">
+  <h2>🐛 发现的问题</h2>
+
+  <table class="risk-table">
+    <thead>
+      <tr>
+        <th style="width:80px">严重度</th>
+        <th>问题描述</th>
+        <th style="width:80px">位置</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="risk-level risk-mid">中</span></td>
+        <td>
+          <strong>XSS 漏洞</strong> — 作者、硬件、许可证字段在渲染时未调用
+          <span class="code">escHtml()</span>，只有描述字段正确转义。
+          恶意输入可注入 HTML/事件处理器。
+        </td>
+        <td>行 1979-1981</td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">低</span></td>
+        <td>
+          <strong>内联事件绑定</strong> — KV 删除按钮使用
+          <span class="code">onclick</span> 属性调用
+          <span class="code">__rfview.markModified()</span>，
+          依赖 <span class="code">window.__rfview</span> 导出。
+          如果 IIFE 重构或 minification 改变导出名，功能将静默失效。
+        </td>
+        <td>行 1992, 2098</td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">低</span></td>
+        <td>
+          <strong>无意义 undefined 赋值</strong> —
+          <span class="code">createAnnotationFromSelection()</span> 设置
+          <span class="code">'core:freq_lower_edge': undefined</span>，
+          被 <span class="code">JSON.stringify</span> 忽略，
+          但代码可读性差且容易混淆。
+        </td>
+        <td>行 2341-2342</td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">低</span></td>
+        <td>
+          <strong>保存后 originalMeta 未同步</strong> — 保存完整 meta 后
+          <span class="code">originalMeta</span> 未更新为保存版本，
+          后续 diff 会将已保存的修改显示为"已删除"。
+        </td>
+        <td>行 2413-2421</td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">低</span></td>
+        <td>
+          <strong>高风险警告无法关闭</strong> — datatype 和 sample_rate 变更警告
+          一旦显示就永久存在，用户无法 dismiss，可能干扰正常编辑。
+        </td>
+        <td>行 2071-2081</td>
+      </tr>
+      <tr>
+        <td><span class="risk-level risk-low">低</span></td>
+        <td>
+          <strong>getModifiedMeta() 存在副作用</strong> — 同时收集表单并更新
+          <span class="code">currentMeta</span>，调用前无需保存也会修改状态。
+          虽然设计上可接受，但函数命名未体现副作用。
+        </td>
+        <td>行 1892-1915</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     代码质量评分
+     ============================================================ -->
+<div class="section">
+  <h2>📊 代码质量评分</h2>
+
+  <div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+      <span style="font-size:13px;font-weight:600">总体质量</span>
+      <span style="font-size:13px;font-weight:700;color:var(--amber)">82 / 100</span>
+    </div>
+    <div class="score-bar"><div class="fill" style="width:82%;background:linear-gradient(90deg, var(--amber), var(--green))"></div></div>
+  </div>
+
+  <table class="risk-table">
+    <thead>
+      <tr><th>维度</th><th>评分</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>功能完整性</td>
+        <td><span class="risk-level risk-low">95/100</span></td>
+        <td>所有 P3 功能均已实现，覆盖 Global 编辑、Capture 管理、Annotation CRUD、保存/导出/撤销。</td>
+      </tr>
+      <tr>
+        <td>代码结构</td>
+        <td><span class="risk-level risk-low">90/100</span></td>
+        <td>IIFE 包裹、严格模式、模块化函数设计、深拷贝备份、统一的事件绑定模式。</td>
+      </tr>
+      <tr>
+        <td>安全性</td>
+        <td><span class="risk-level risk-mid">70/100</span></td>
+        <td>基础 XSS 防护已实现（escHtml），但 3 个字段遗漏；依赖内联 onclick 绑定到全局导出。</td>
+      </tr>
+      <tr>
+        <td>用户体验</td>
+        <td><span class="risk-level risk-low">85/100</span></td>
+        <td>确认对话框、实时验证、风险提示、可见性过滤、居中降级定位。警告无法关闭是唯一减分项。</td>
+      </tr>
+      <tr>
+        <td>健壮性</td>
+        <td><span class="risk-level risk-low">80/100</span></td>
+        <td>有异常处理、数据边界检查、表单校验。保存后 originalMeta 未同步可能造成困惑。</td>
+      </tr>
+      <tr>
+        <td>可维护性</td>
+        <td><span class="risk-level risk-low">75/100</span></td>
+        <td>单文件 2572 行 JS+HTML+CSS 混合，内联 onclick 和 window 导出不利于单元测试。
+        建议拆分模块。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     改进建议
+     ============================================================ -->
+<div class="section">
+  <h2>🚀 改进建议</h2>
+
+  <ul class="suggest-list">
+    <li><strong>[安全] 统一 escHtml 调用</strong> — 在行 1979-1981 对
+      <span class="code">author</span>、<span class="code">hw</span>、
+      <span class="code">license</span> 使用 <span class="code">escHtml()</span>。
+      建议在 <span class="code">renderEditableMetaPanel</span> 中建立一个
+      <span class="code">safeAttr(value)</span> 包装函数，确保所有属性输出都经过转义。</li>
+    <li><strong>[安全] 改用事件委托</strong> — KV 删除按钮改用
+      <span class="code">kvContainer.addEventListener('click', ...)</span>
+      事件委托，避免内联 <span class="code">onclick</span> 和全局导出依赖。</li>
+    <li><strong>[功能] 保存后同步 originalMeta</strong> — 保存完整 meta 后
+      将 <span class="code">originalMeta = deepClone(currentMeta)</span>，
+      使下次 diff 准确反映增量修改。</li>
+    <li><strong>[UX] 可关闭的风险警告</strong> — 为 <span class="code">#dtWarn</span>
+      和 <span class="code">#srWarn</span> 添加 ✕ 关闭按钮，
+      或将警告改为一次性提示（用户确认后不再显示）。</li>
+    <li><strong>[代码] 消除 getModifiedMeta 副作用</strong> — 分离"收集"和"更新"逻辑，
+      或重命名为 <span class="code">collectAndReturnModifiedMeta()</span> 更准确表达。</li>
+    <li><strong>[代码] 清理 undefined 赋值</strong> — 行 2341-2342 删除
+      <span class="code">'core:freq_lower_edge': undefined</span>，
+      在新标注中直接不设置该字段。</li>
+    <li><strong>[代码] 提取模块</strong> — 考虑将 P3 功能拆分为独立 JS 文件：
+      <span class="code">metaEditor.js</span>、<span class="code">annotManager.js</span>、
+      <span class="code">saveManager.js</span>，便于维护和测试。</li>
+    <li><strong>[测试] 追加自动化测试</strong> — 当前纯手工审计。建议使用
+      Puppeteer/Playwright 对编辑、保存、撤销流程做 E2E 测试。</li>
+  </ul>
+</div>
+
+<!-- ============================================================
+     代码覆盖率快照
+     ============================================================ -->
+<div class="section">
+  <h2>📐 P3 功能代码覆盖率</h2>
+
+  <table class="risk-table">
+    <thead>
+      <tr><th>功能模块</th><th>函数名称</th><th>行号</th><th>行数</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>工具函数</td><td><span class="code">deepClone / markModified / clearModified</span></td><td>1832-1853</td><td>22</td></tr>
+      <tr><td>表单收集</td><td><span class="code">collectFormToMeta / getModifiedMeta</span></td><td>1856-1915</td><td>60</td></tr>
+      <tr><td>确认对话框</td><td><span class="code">showConfirm</span></td><td>1918-1933</td><td>16</td></tr>
+      <tr><td>可编辑面板</td><td><span class="code">renderEditableMetaPanel</span></td><td>1938-2057</td><td>120</td></tr>
+      <tr><td>HTML 转义</td><td><span class="code">escHtml</span></td><td>2060-2063</td><td>4</td></tr>
+      <tr><td>事件绑定</td><td><span class="code">bindMetaEditEvents</span></td><td>2066-2175</td><td>110</td></tr>
+      <tr><td>Capture 校验</td><td><span class="code">validateCaptureMonotonic</span></td><td>2178-2203</td><td>26</td></tr>
+      <tr><td>编辑器浮窗</td><td><span class="code">openAnnotationEditor / closeAnnotationEditor</span></td><td>2206-2285</td><td>80</td></tr>
+      <tr><td>表单验证</td><td><span class="code">validateAnnotationForm</span></td><td>2288-2299</td><td>12</td></tr>
+      <tr><td>保存标注</td><td><span class="code">saveAnnotationEdit</span></td><td>2302-2327</td><td>26</td></tr>
+      <tr><td>新建标注</td><td><span class="code">createAnnotationFromSelection</span></td><td>2330-2349</td><td>20</td></tr>
+      <tr><td>Diff 预览</td><td><span class="code">computeDiff / showDiffPreview</span></td><td>2352-2382</td><td>31</td></tr>
+      <tr><td>保存导出</td><td><span class="code">downloadJSON / saveAsOverlay / saveFullMeta / revertAllChanges</span></td><td>2385-2436</td><td>52</td></tr>
+      <tr><td>P3 初始化</td><td><span class="code">handleFileSelect / 事件绑定 / 导出</span></td><td>2441-2567</td><td>127</td></tr>
+      <tr><td colspan="3" style="font-weight:700;color:var(--text-bright)">P3 代码总计</td><td style="font-weight:700;color:var(--accent)">~706 行</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<div class="footer">
+  <p>RFview P3 验收测试 · 卧龙深度审查 · deepseek-v4-pro</p>
+  <p>报告生成: 2026-06-01 · viewer.html (2572 行) · 测试数据: trimmedSamples.sigmf-meta (3286 条 annotation)</p>
+  <p style="margin-top:4px">代码: <code>/mnt/d/CodeLab/RFview/viewer.html</code> · 报告: <code>test/reports/p3_acceptance.html</code></p>
+</div>
+
+</body>
+</html>

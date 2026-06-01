@@ -40,12 +40,12 @@ class SigMFDocument:
         data = json.loads(meta_path.read_text(encoding="utf-8"))
         global_meta = dict(data.get("global") or data.get("core:global") or {})
         captures = [
-            CaptureSegment(int(item.get("core:sample_start", item.get("sample_start", 0))), dict(item))
+            CaptureSegment(_int_or_default(item.get("core:sample_start", item.get("sample_start", 0)), 0), dict(item))
             for item in data.get("captures", [])
         ]
         annotations = [
             AnnotationSegment(
-                int(item.get("core:sample_start", item.get("sample_start", 0))),
+                _int_or_default(item.get("core:sample_start", item.get("sample_start", 0)), 0),
                 _optional_int(item.get("core:sample_count", item.get("sample_count"))),
                 dict(item),
             )
@@ -65,7 +65,7 @@ class SigMFDocument:
     @property
     def sample_rate(self) -> float | None:
         value = self.global_meta.get("core:sample_rate") or self.global_meta.get("sample_rate")
-        return float(value) if value is not None else None
+        return _optional_float(value)
 
     @property
     def data_path(self) -> Path:
@@ -93,8 +93,8 @@ class SigMFDocument:
             if capture.sample_start > sample_start:
                 break
             active = capture
-        value = active.metadata.get("core:frequency") or active.metadata.get("frequency")
-        return float(value) if value is not None else None
+        value = active.metadata.get("core:frequency", active.metadata.get("frequency"))
+        return _optional_float(value)
 
     def sample_count_from_file(self) -> int | None:
         if not self.datatype:
@@ -117,7 +117,7 @@ class SigMFDocument:
         )
         for value in candidates:
             if value is not None:
-                return int(value)
+                return _optional_int(value)
         return None
 
     def sample_count_matches_data(self) -> bool | None:
@@ -158,14 +158,20 @@ class SigMFDocument:
                 issues.append(Issue("error", "SIGMF_ANNOTATION_NEGATIVE_LENGTH", "Annotation sample_count is negative.", "Use a non-negative core:sample_count.", ann_path))
             if total_samples is not None and ann.sample_count is not None and ann.sample_start + ann.sample_count > total_samples:
                 issues.append(Issue("error", "SIGMF_ANNOTATION_OOB", "Annotation exceeds data file sample range.", "Clamp the annotation or fix the data/sample metadata.", ann_path))
-            lower = ann.metadata.get("core:freq_lower_edge") or ann.metadata.get("freq_lower")
-            upper = ann.metadata.get("core:freq_upper_edge") or ann.metadata.get("freq_upper")
+            lower = ann.metadata.get("core:freq_lower_edge", ann.metadata.get("freq_lower"))
+            upper = ann.metadata.get("core:freq_upper_edge", ann.metadata.get("freq_upper"))
             if nyquist is not None and (lower is not None or upper is not None):
                 center = self.capture_frequency_at(ann.sample_start)
                 min_freq = (center - nyquist) if center is not None else -nyquist
                 max_freq = (center + nyquist) if center is not None else nyquist
-                lower_oob = lower is not None and not min_freq <= float(lower) <= max_freq
-                upper_oob = upper is not None and not min_freq <= float(upper) <= max_freq
+                lower_value = _optional_float(lower)
+                upper_value = _optional_float(upper)
+                if lower is not None and lower_value is None:
+                    issues.append(Issue("error", "SIGMF_ANNOTATION_FREQ_INVALID", "Annotation lower frequency edge is not numeric.", "Use a numeric core:freq_lower_edge value.", ann_path))
+                if upper is not None and upper_value is None:
+                    issues.append(Issue("error", "SIGMF_ANNOTATION_FREQ_INVALID", "Annotation upper frequency edge is not numeric.", "Use a numeric core:freq_upper_edge value.", ann_path))
+                lower_oob = lower_value is not None and not min_freq <= lower_value <= max_freq
+                upper_oob = upper_value is not None and not min_freq <= upper_value <= max_freq
                 if lower_oob or upper_oob:
                     issues.append(Issue("error", "SIGMF_ANNOTATION_FREQ_OOB", "Annotation frequency edge exceeds capture Nyquist range.", "Keep annotation frequency bounds within the active capture center frequency +/- sample_rate/2.", ann_path))
             if "core:label" not in ann.metadata and "label" not in ann.metadata:
@@ -192,4 +198,21 @@ class SigMFDocument:
 def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_default(value: Any, default: int) -> int:
+    parsed = _optional_int(value)
+    return default if parsed is None else parsed
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
